@@ -19,6 +19,8 @@ npm run dev
 
 Open http://127.0.0.1:5340 and select **Open the feed**. No API key is needed: the offline scene uses browser speech and browser storage, and AI starts off for a new visitor. **Reset session memory** starts fresh with AI off; **Restore previous session** restores the one local undo slot.
 
+The offline scene also supports ordinary HTTP origins when hosted on another device. Local record IDs use Web Crypto randomness even when the browser does not expose `crypto.randomUUID()`; HTTPS is still required for browser features that require a secure context.
+
 `npm run build` writes a static production build to `dist/`, and `npm run preview` serves it on http://127.0.0.1:5340.
 
 ## Using the interface

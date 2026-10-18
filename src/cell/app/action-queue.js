@@ -1,4 +1,5 @@
 import {normalizeActionResult, failed, cancelled} from '../actions/result.js';
+import {createId as generateId} from '../id.js';
 export function createActionQueue({
   state,
   actions,
@@ -16,7 +17,7 @@ export function createActionQueue({
   now = () => performance.now() / 1000,
   wallNow = Date.now,
   random = Math.random,
-  createId = () => crypto.randomUUID(),
+  createId = generateId,
   createAbortController = () => new AbortController(),
 } = {}) {
   function runNext(time) {
