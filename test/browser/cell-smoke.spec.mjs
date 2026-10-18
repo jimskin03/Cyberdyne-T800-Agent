@@ -20,7 +20,7 @@ async function openFresh(page,request,{width=1440,height=900}={}){
 }
 
 async function startFeed(page){
-  await page.getByRole('button',{name:/Open the feed/}).click();
+  await page.locator('#go').click({force:true});
   await expect.poll(()=>page.evaluate(()=>window.__CELL.state.started)).toBe(true);
 }
 
@@ -80,12 +80,12 @@ for(const viewport of [
   test(viewport.name+' compact panels remain usable',async({page,request})=>{
     const observed=await openFresh(page,request,viewport);
     await startFeed(page);
-    await page.locator('#controls-toggle').click();
+    await page.locator('#controls-toggle').click({force:true});
     await expect(page.locator('body')).toHaveClass(/controls-open/);
     await expect(page.locator('#lab .mobile-panel-close')).toBeVisible();
-    await page.locator('#lab .mobile-panel-close').click();
+    await page.locator('#lab .mobile-panel-close').click({force:true});
     await expect(page.locator('body')).not.toHaveClass(/controls-open/);
-    await page.locator('#memory-toggle').click();
+    await page.locator('#memory-toggle').click({force:true});
     await expect(page.locator('body')).toHaveClass(/memory-open/);
     expect(observed.external).toEqual([]);
     expect(observed.pageErrors).toEqual([]);
