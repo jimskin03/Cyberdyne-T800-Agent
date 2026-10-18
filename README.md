@@ -15,6 +15,8 @@ npm run dev
 
 Open http://127.0.0.1:5340 and select **Open the feed**. No API key is needed. The local scene uses browser speech and browser storage. State is scoped to this package. **Reset session memory** starts fresh with AI off; **Restore previous session** provides one local undo slot. Neither saved state nor the undo slot is included in source exports. AI starts off for a new visitor and remembers the operator's later choice.
 
+On phones and short landscape screens, **Controls** opens the operator settings, including **AI mind**, and **Memory** opens the interactive JSON brain. Each panel scrolls and has a **Close** button. Selecting a tool closes Controls so you can tap the unit in the scene.
+
 ```sh
 npm test
 npm run build
