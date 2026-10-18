@@ -28,7 +28,7 @@ export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcur
    }catch{send(401,{error:'Sign-in failed or expired. Return to the scene and try again.'});}
    return;
   }
-  if(!guardLocalRequest(req,res))return;
+  if(!guardLocalRequest(req,res,{allowedOrigins:config.allowedOrigins||[]}))return;
   if(req.method==='GET'&&req.url==='/health')return send(200,connections.health(connections.current()));
   if(oauth&&connections.current().authMode==='oauth'&&req.method==='GET'&&req.url==='/auth/login'){
    res.writeHead(302,{location:oauth.begin(),'cache-control':'no-store','referrer-policy':'no-referrer'});res.end();return;

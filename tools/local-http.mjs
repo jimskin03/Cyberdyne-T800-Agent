@@ -3,12 +3,15 @@ export function sendJson(res,status,value){
  res.writeHead(status,{'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff'});
  res.end(JSON.stringify(value));
 }
-export function guardLocalRequest(req,res){
+export function guardLocalRequest(req,res,{allowedOrigins=[]}={}){
  const host=req.headers.host||'',port=req.socket.localPort;
- const origins=new Set(['http://127.0.0.1:5340','http://localhost:5340']);
+ const origins=new Set(['http://127.0.0.1:5340','http://localhost:5340',...allowedOrigins]);
  if(!new RegExp('^(127\\.0\\.0\\.1|localhost):'+port+'$').test(host)||
-    req.headers['sec-fetch-site']==='cross-site'||(req.headers.origin&&!origins.has(req.headers.origin))){
+    req.headers['sec-fetch-site']==='cross-site'){
   sendJson(res,403,{error:'Local scene clients only.'});return false;
+ }
+ if(req.headers.origin&&!origins.has(req.headers.origin)){
+  sendJson(res,403,{code:'scene_origin_not_allowed',error:'Scene origin is not allowed. Set API_ALLOWED_ORIGINS on the adapter for your scene address, then restart npm run api.'});return false;
  }
  if(req.method==='POST'&&!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type']||'')){
   sendJson(res,415,{error:'Use application/json.'});return false;

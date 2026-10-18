@@ -58,6 +58,41 @@ test('blank startup configuration stays unconfigured until the scene sets a conn
  assert.throws(()=>apiConfiguration({API_KEY:'unit-key'}),/API_BASE_URL/);
  assert.throws(()=>apiConfiguration({API_AUTH_MODE:'none'}),/API_BASE_URL/);
 });
+test('scene origins are an explicit server setting with no wildcard or URL credentials',()=>{
+ assert.deepEqual(apiConfiguration({}).allowedOrigins,[]);
+ const value=apiConfiguration({API_ALLOWED_ORIGINS:'http://100.64.0.10:5340/, https://scene.example http://100.64.0.10:5340'});
+ assert.equal(value.configured,false);
+ assert.deepEqual(value.allowedOrigins,['http://100.64.0.10:5340','https://scene.example']);
+ for(const origin of ['*','null','http://*.example','https://scene.example/path','https://scene.example?x=1','https://scene.example#x',['https://user',':password','@scene.example'].join(''),'file:///tmp/scene'])
+  assert.throws(()=>apiConfiguration({API_ALLOWED_ORIGINS:origin}),/API_ALLOWED_ORIGINS/);
+});
+test('an explicitly allowed private scene origin can connect and chat through a loopback adapter',async t=>{
+ const origin='http://100.64.0.10:5340',key=['private','scene','fixture'].join('-'),calls=[];
+ const url=await setup(t,{fetcher:async(endpoint,options)=>{calls.push({endpoint,options});return Response.json({choices:[{message:{content:'Mock private scene reply'}}]});}},apiConfiguration({API_ALLOWED_ORIGINS:origin}));
+ const headers={'content-type':'application/json',origin,'sec-fetch-site':'same-origin'};
+ const body={kind:'openai-compatible',baseUrl:'https://openrouter.ai/api/v1',apiKey:key,textModel:'openrouter/free',allowedOrigins:['https://client-chosen.invalid']};
+ const response=await fetch(url+'/connection',{method:'POST',headers,body:JSON.stringify(body)});
+ assert.equal(response.status,200);
+ const health=await response.json();assert.equal(health.status,'ok');assert.equal(health.connection.host,'openrouter.ai');
+ assert.equal(JSON.stringify(health).includes(key),false);assert.equal(JSON.stringify(health).includes(origin),false);
+ const answer=await post(url,thought,headers);assert.equal(answer.status,200);
+ assert.equal(calls[0].endpoint,'https://openrouter.ai/api/v1/chat/completions');
+ assert.equal(calls[0].options.headers.authorization,'Bearer '+key);
+ assert.equal(JSON.parse(calls[0].options.body).model,'openrouter/free');
+ assert.equal((await post(url,thought,{origin:'https://client-chosen.invalid'})).status,403);
+});
+test('allowing one private scene keeps other origins and cross-site requests blocked',async t=>{
+ let calls=0;
+ const origin='http://100.64.0.10:5340';
+ const url=await setup(t,{fetcher:async()=>{calls++;return Response.json({});}},apiConfiguration({API_ALLOWED_ORIGINS:origin}));
+ for(const other of ['http://100.64.0.11:5340','http://100.64.0.10:5341','https://100.64.0.10:5340','null']){
+  const response=await post(url,thought,{origin:other,'sec-fetch-site':'same-origin'});
+  assert.equal(response.status,403);assert.equal((await response.json()).code,'scene_origin_not_allowed');
+ }
+ assert.equal((await post(url,thought,{origin,'sec-fetch-site':'cross-site'})).status,403);
+ const spoofed=await new Promise((resolve,reject)=>{const req=http.request(url+'/connection',{method:'POST',headers:{host:'untrusted.invalid',origin,'content-type':'application/json'}},res=>{res.resume();resolve(res.statusCode);});req.on('error',reject);req.end('{}');});
+ assert.equal(spoofed,403);assert.equal(calls,0);
+});
 test('scene connection accepts an OpenAI-compatible API and an invited alternative without leaking the key',async t=>{
  const key=['unit','scene','key'].join('-'),calls=[];
  const url=await setup(t,{fetcher:async(endpoint,options)=>{calls.push({endpoint,authorization:options.headers.authorization,body:JSON.parse(options.body)});return Response.json({choices:[{message:{content:'{"thought":"ok","say":"here","actions":[]}'}}]});}},{configured:false,endpoint:'',key:'',textModel:'',visionModel:'',creativeModel:'',agentName:'Agent',authMode:'none',oauth:null});

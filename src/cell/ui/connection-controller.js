@@ -1,3 +1,12 @@
+export function connectionFailureMessage(status, data) {
+  if (typeof data?.error === 'string' && data.error.trim()) return data.error.slice(0, 180);
+  if (status === 404)
+    return 'No API adapter at /llm. Run npm run api alongside npm run dev. Static hosting needs a same-origin /llm backend.';
+  if (status >= 500)
+    return 'Agent adapter is unavailable. Start it with npm run api, then try again.';
+  return 'Connection was rejected. Check the adapter configuration.';
+}
+
 export function createConnectionController({
   document = globalThis.document,
   window = globalThis.window,
@@ -10,6 +19,14 @@ export function createConnectionController({
 } = {}) {
   const $ = (id) => document.getElementById(id);
   let displayedAgentName = '';
+  function showConnectionError(message = '') {
+    const error = $('agent-connection-error');
+    if (error) {
+      error.textContent = message;
+      error.hidden = !message;
+    }
+    if (message) toast(message);
+  }
 
   function paint() {
     const name = mind.st.agentName || 'Agent';
@@ -113,6 +130,7 @@ export function createConnectionController({
   }
 
   function hideForms() {
+    showConnectionError();
     for (const [form, button] of [
       ['openai-api-form', 'openai-api-toggle'],
       ['invite-agent-form', 'invite-agent-toggle'],
@@ -178,10 +196,14 @@ export function createConnectionController({
       );
     }
     const data = await response.json().catch(() => ({}));
-    if (!response.ok)
-      throw Error(
-        typeof data.error === 'string' ? data.error.slice(0, 180) : 'Connection was rejected.',
-      );
+    if (!response.ok) throw Error(connectionFailureMessage(response.status, data));
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      Array.isArray(data) ||
+      (!['ok', 'unconfigured', 'auth_required'].includes(data.status) && data.ok !== true)
+    )
+      throw Error('Invalid API adapter response. Check the /llm backend and proxy configuration.');
     return data;
   }
 
@@ -252,7 +274,7 @@ export function createConnectionController({
       paint();
       toast('OpenAI-compatible API connected.');
     } catch (error) {
-      toast(error.message);
+      showConnectionError(error.message);
     }
   };
 
@@ -279,7 +301,7 @@ export function createConnectionController({
       paint();
       toast((mind.st.agentName || 'Agent') + ' invited.');
     } catch (error) {
-      toast(error.message);
+      showConnectionError(error.message);
     }
   };
 
