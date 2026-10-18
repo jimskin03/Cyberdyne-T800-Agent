@@ -38,6 +38,8 @@ Reply with the JSON object only.`;
       state.artMs = Math.round(now() - started);
       return art;
     } catch (error) {
+      if (signal?.aborted || lifecycleSignal?.aborted || error?.name === 'AbortError')
+        throw error?.name === 'AbortError' ? error : new DOMException('Creative request cancelled.', 'AbortError');
       logger.error('artist', error);
       return null;
     }
@@ -64,6 +66,8 @@ ${current ? 'CURRENT SOURCE (improve this, return the full updated file):\n' + c
       state.codeMs = Math.round(now() - started);
       return output;
     } catch (error) {
+      if (signal?.aborted || lifecycleSignal?.aborted || error?.name === 'AbortError')
+        throw error?.name === 'AbortError' ? error : new DOMException('Creative request cancelled.', 'AbortError');
       logger.error('coder', error);
       return null;
     }
@@ -89,6 +93,8 @@ Idea: ${idea || 'a personal decoration for the cell'}${current ? '\nCurrent buil
       );
       return parseCreation(json.choices?.[0]?.message?.content);
     } catch (error) {
+      if (signal?.aborted || lifecycleSignal?.aborted || error?.name === 'AbortError')
+        throw error?.name === 'AbortError' ? error : new DOMException('Creative request cancelled.', 'AbortError');
       logger.error('3D builder', error);
       return null;
     }

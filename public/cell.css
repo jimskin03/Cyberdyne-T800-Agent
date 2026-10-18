@@ -8,7 +8,7 @@ button,select,input{font-family:inherit}button{cursor:pointer;color:inherit;back
 .eyebrow,.panel-title,.section-label,footer,.topline,kbd,.hint,.meter,#status,#mind,#doing-row,#thought-row b,#pov-label{font-family:var(--mono)}
 .live{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:6px;animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.25}}
 header{position:fixed;top:22px;left:26px;pointer-events:none}header .eyebrow{font-size:9px;letter-spacing:1.5px;color:#9fb2ba}header h1{margin:8px 0 5px;font-size:34px;letter-spacing:-1.5px;color:#fff;line-height:1}header h1 span{display:block;font:700 11px var(--mono);letter-spacing:3px;color:var(--amber);margin-top:6px}.sub{font-size:11px;color:#9fb2ba;max-width:280px}
-.topline{position:fixed;top:22px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:center;font-size:9px;letter-spacing:1px;padding:5px 6px 5px 12px;background:var(--glass);border:1px solid var(--line);border-radius:6px;color:#9fb2ba;white-space:nowrap}.topline b{color:#fff;font-size:12px}
+.topline{position:fixed;top:22px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:center;font-size:9px;letter-spacing:1px;padding:5px 6px 5px 12px;background:var(--glass);border:1px solid var(--line);border-radius:6px;color:#9fb2ba;white-space:nowrap;z-index:3}.topline b{color:#fff;font-size:12px}
 #clock{color:#fff;font-weight:700}#air.on{color:#ff8a7a}
 #brain-status{padding:3px 8px;border-radius:4px;border:1px solid #ffffff22}#brain-status.on{color:var(--green);border-color:#7dffa655}#brain-status.off{color:#ff9a8a}
 .modelink{color:var(--amber);text-decoration:none;border:1px solid #f2c14e55;border-radius:4px;padding:5px 8px}.modelink:hover{background:#f2c14e22}

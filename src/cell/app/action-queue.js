@@ -1,4 +1,4 @@
-import {normalizeActionResult, failed} from '../actions/result.js';
+import {normalizeActionResult, failed, cancelled} from '../actions/result.js';
 export function createActionQueue({
   state,
   actions,
@@ -45,8 +45,14 @@ export function createActionQueue({
     const execute = actions.runResult ? actions.runResult(pending, token) : actions.run(pending, token).then(normalizeActionResult);
     execute
       .then((outcome) => {
-        const result=normalizeActionResult(outcome);
-        if (token.cancelled || result.status==='cancelled') return;
+        const result = token.cancelled || token.signal?.aborted
+          ? cancelled('The action was cancelled before completion.')
+          : normalizeActionResult(outcome);
+        if (result.status === 'cancelled') {
+          state.events.push({kind: 'result', text: result.text, status: result.status, t: formatTime(state.simMin)});
+          journal('result', result.text, {action, status: 'cancelled', success: false});
+          return;
+        }
         if (token.observation) state.pendingObservation = token.observation;
         if (!result.text) return;
 
@@ -69,7 +75,12 @@ export function createActionQueue({
         });
       })
       .catch((error) => {
-        if (error === interrupt || token.cancelled || error?.name === 'AbortError') return;
+        if (error === interrupt || token.cancelled || error?.name === 'AbortError') {
+          const result = cancelled();
+          state.events.push({kind: 'result', text: result.text, status: 'cancelled', t: formatTime(state.simMin)});
+          journal('result', result.text, {action, status: 'cancelled', success: false});
+          return;
+        }
         console.error(error);
         const result = failed('That action failed: ' + String(error?.message || error).slice(0, 220));
         state.events.push({kind: 'result', text: result.text, status: result.status, t: formatTime(state.simMin)});

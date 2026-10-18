@@ -41,7 +41,7 @@ Measurements below use the same Vite build command as the baseline. Modularity i
 | Creation worker | 745.97 kB | 745.97 kB | unchanged |
 | Main CSS | 10.85 kB (3.14 kB gzip) | 10.85 kB (3.14 kB gzip) | unchanged |
 
-The entry increase is small but real, so this refactor does **not** claim a startup or bundle-size improvement. Its measured benefit is separation/testability. Browser timing/transfer deltas should be recorded later in an environment that can execute the pinned Chromium suite and compared only against the same runner/browser setup.
+The entry increase is small but real, so this refactor does **not** claim a startup or bundle-size improvement. Its measured benefit is separation/testability. Browser timing/transfer deltas should be recorded later in an environment that can execute the pinned Chromium suite and compared only against the same browser and operating setup.
 
 ## Responsibility size snapshot
 

@@ -27,7 +27,7 @@ The browser suite starts a local mocked `/llm` adapter and a fresh Vite server. 
 - session reset and the single undo slot;
 - rejection of unexpected external browser requests and page errors.
 
-The browser baseline test prints a `browser-baseline` JSON record with DOMContentLoaded time, load time, resource count, and transferred bytes. Compare measurements only in the same browser/runner environment.
+The browser baseline test prints a `browser-baseline` JSON record with DOMContentLoaded time, load time, resource count, and transferred bytes. Compare measurements only in the same browser and operating environment.
 
 ## Baseline results
 

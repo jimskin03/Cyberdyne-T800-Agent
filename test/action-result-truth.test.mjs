@@ -34,3 +34,10 @@ test('learning trusts completed status even when prose contains failure words',a
  assert.equal(state.events[0].status,'completed');
  assert.equal(journalRows.find(row=>row.kind==='result').details.success,true);
 });
+
+test('cancelled actions create an accurate result event without training as success or failure',async()=>{
+ const {state,observations,journalRows}=await exercise('cancelled','Action cancelled.');
+ assert.equal(observations.length,0);
+ assert.equal(state.events[0].status,'cancelled');
+ assert.equal(journalRows.find(row=>row.kind==='result').details.status,'cancelled');
+});

@@ -324,7 +324,7 @@ export function createActions(world, body, cb) {
   const held = () => body.st.holding;
   async function pickUp(id) {
     const r = resolve(id);
-    if (!r || r.kind !== 'item') return `There is no ${id} here to pick up.`;
+    if (!r || r.kind !== 'item') return unavailable(`There is no ${id} here to pick up.`);
     const it = r.item;
     if (it.held) return `You are already holding ${it.name}.`;
     await goTo(r, speed());
@@ -353,7 +353,7 @@ export function createActions(world, body, cb) {
   }
   async function putDown(target) {
     const it = held();
-    if (!it) return 'Your hands are empty.';
+    if (!it) return blocked('Your hands are empty.');
     if (target) {
       const r = resolve(target);
       if (r) await goTo(r, speed());
@@ -386,6 +386,7 @@ export function createActions(world, body, cb) {
   }
   async function tidy(a) {
     const named = a.object ? resolve(a.object)?.item : null;
+    if (a.object && !named) return unavailable(`No known object "${a.object}" to tidy.`);
     const targets = named
       ? [named]
       : [
@@ -407,6 +408,7 @@ export function createActions(world, body, cb) {
       done.push(it.name + (wasBroken ? ' (pieces collected and repaired)' : ''));
       cb.mood({despair: -1});
     }
+    if (!done.length) return blocked('You could not collect or reorganize the selected objects.');
     return (
       'You collect, carry and reorganize ' +
       done.join(', ') +
@@ -419,7 +421,7 @@ export function createActions(world, body, cb) {
       if (e) return e;
     }
     const it = held();
-    if (!it) return 'You have nothing in your hand to throw.';
+    if (!it) return blocked('You have nothing in your hand to throw.');
     const r = resolve(target) || {
       name: 'the far wall',
       look: new T.Vector3(
@@ -587,7 +589,9 @@ export function createActions(world, body, cb) {
             );
             title = res.title || subject;
           } else if (!strokes)
-            return 'You hold the chalk to the surface for a long time, but the picture will not come. Nothing goes on the wall.';
+            return failed(
+              'You hold the chalk to the surface for a long time, but the picture will not come. Nothing goes on the wall.',
+            );
         } else
           strokes = strokes.map((st) =>
             Array.isArray(st)
@@ -602,7 +606,7 @@ export function createActions(world, body, cb) {
               : st,
           );
         const m = world.chalkDraw(sid, strokes, title, a.width);
-        if (!m) return 'The lines make no sense; nothing goes on the wall.';
+        if (!m) return failed('The lines make no sense; nothing goes on the wall.');
         await chalkWork(
           m,
           info,
@@ -835,7 +839,7 @@ export function createActions(world, body, cb) {
     try {
       const r = await cb.browser(a);
       return r.error
-        ? 'Browser: ' + r.error
+        ? failed('Browser: ' + String(r.error).slice(0, 220))
         : `Slopcannon ${r.needsSignIn ? 'needs operator sign-in' : r.title || 'opened'}. ${String(r.ui || '').slice(0, 1600)}`;
     } finally {
       body.clearGesture();
@@ -850,7 +854,7 @@ export function createActions(world, body, cb) {
       a.idea || a.what || a.change || a.description || a.text || a.how || '',
     ).trim();
     if (!idea && !name)
-      return 'You sit in front of the computer, but you do not know what to build.';
+      return blocked('You sit in front of the computer, but you do not know what to build.');
     await atDesk();
     const prev = name ? pc.app(name) : null;
     if (prev) name = prev.name;
@@ -878,7 +882,7 @@ export function createActions(world, body, cb) {
       await until(() => done && now - t0 > 8, 320);
       if (!res) {
         world.crt.set('desktop', {list: pc.files()});
-        return 'The program will not come together. You delete it and sit back.';
+        return failed('The program will not come together. You delete it and sit back.');
       }
       world.crt.feed(res.html);
       await sleep(Math.min(7, 2 + res.html.length / 9000));
@@ -895,7 +899,7 @@ export function createActions(world, body, cb) {
     const pc = cb.computer;
     const title = String(a.title || a.name || 'Note').slice(0, 40),
       text = String(a.text || a.content || a.body || '').slice(0, 4000);
-    if (!text) return 'You open a blank note and close it again.';
+    if (!text) return blocked('You open a blank note and close it again.');
     await atDesk();
     world.crt.set('note', {title, text});
     body.gesture('type', 999, true);
@@ -1048,7 +1052,7 @@ export function createActions(world, body, cb) {
   }
   async function kick(id) {
     const r = resolve(id);
-    if (!r || r.kind !== 'item') return 'There is nothing like that to kick.';
+    if (!r || r.kind !== 'item') return unavailable('There is nothing like that to kick.');
     const it = r.item;
     if (it.held)
       body.placeAt(
@@ -1132,9 +1136,7 @@ export function createActions(world, body, cb) {
       throw error;
     }
     if (token?.cancelled || token?.signal?.aborted) throw INTERRUPT;
-    return observed && typeof observed.text === 'string' && observed.text.trim()
-      ? observed
-      : {text: 'Fresh optical observation unavailable.'};
+    return observed && typeof observed.text === 'string' && observed.text.trim() ? observed : null;
   }
   // ---------- the dispatcher ----------
   async function runResult(a, token) {
@@ -1145,7 +1147,9 @@ export function createActions(world, body, cb) {
         {action: canonicalAction(requested)},
       );
     try {
-      return normalizeActionResult(await dispatch(a, token));
+      const outcome = await dispatch(a, token);
+      if (token?.cancelled || token?.signal?.aborted) return cancelled();
+      return normalizeActionResult(outcome);
     } catch (e) {
       if (e === INTERRUPT || token?.cancelled || token?.signal?.aborted || e?.name === 'AbortError')
         return cancelled('The action was cancelled before completion.');
@@ -1227,7 +1231,9 @@ export function createActions(world, body, cb) {
       case 'observe': {
         const r = obj ? resolve(obj) : null;
         if (obj && !r)
-          return `You cannot aim the optical frame at "${obj}": that target is not known.`;
+          return unavailable(
+            `You cannot aim the optical frame at "${obj}": that target is not known.`,
+          );
         const observed = await observeTarget(r, token);
         if (!observed)
           return unavailable('Optical capture is unavailable; no new observation was acquired.');
@@ -1277,11 +1283,19 @@ export function createActions(world, body, cb) {
         cb.planning('building a physical 3D object: ' + String(a.idea || a.name || ''), 'code');
         try {
           const it = await cb.creator({...a, token});
-          if (token?.cancelled) throw INTERRUPT;
+          if (token?.cancelled || token?.signal?.aborted) throw INTERRUPT;
           return `You create ${it.name}: ${it.desc}. It now exists in your cell at (${it.obj.position.x.toFixed(1)}, ${it.obj.position.z.toFixed(1)}). You can inspect it, pick it up, kick it or throw it.`;
         } catch (e) {
-          if (e === INTERRUPT) throw e;
-          return 'The 3D object could not be built: ' + e.message;
+          if (
+            e === INTERRUPT ||
+            token?.cancelled ||
+            token?.signal?.aborted ||
+            e?.name === 'AbortError'
+          )
+            throw INTERRUPT;
+          return failed(
+            'The 3D object could not be built: ' + String(e?.message || e).slice(0, 220),
+          );
         } finally {
           body.clearGesture();
         }
