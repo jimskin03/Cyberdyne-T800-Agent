@@ -5,7 +5,7 @@ const allowedRequest=url=>{
   return ['127.0.0.1','localhost'].includes(value.hostname)||['data:','blob:','about:'].includes(value.protocol);
 };
 
-async function openFresh(page,request,{width=1440,height=900}={}){
+async function openFresh(page,request,{width=1152,height=720}={}){
   await request.post('http://127.0.0.1:18081/__reset');
   await page.setViewportSize({width,height});
   const pageErrors=[],consoleErrors=[],external=[];
@@ -39,11 +39,13 @@ async function connectMockAgent(page){
 async function sendIntercom(page,text){
   const before=await page.evaluate(()=>window.__CELL.state.journal.filter(entry=>entry.kind==='say').length);
   await page.locator('#ask').fill(text);
-  await page.locator('#ask-btn').click();
+  // The intercom also submits on Enter; avoid pointer actionability retries under software WebGL.
+  await page.locator('#ask').press('Enter');
   await expect.poll(()=>page.evaluate(()=>window.__CELL.state.journal.filter(entry=>entry.kind==='say').length),{timeout:15_000}).toBeGreaterThan(before);
 }
 
 test('desktop startup, mocked connection, consecutive replies, fresh inspection and computer',async({page,request})=>{
+  test.setTimeout(270_000); // GitHub Actions runs WebGL through software SwiftShader.
   const observed=await openFresh(page,request);
   await expect(page.locator('#start')).not.toHaveClass(/gone/);
   await startFeed(page);
@@ -95,6 +97,7 @@ for(const viewport of [
 }
 
 test('reset keeps one compatible undo slot and restores namespaced state',async({page,request})=>{
+  test.setTimeout(210_000); // two full WebGL initialization/reload cycles under SwiftShader.
   await openFresh(page,request);
   await page.evaluate(()=>localStorage.setItem('cell-public-test.marker','kept-for-undo'));
   await startFeed(page);
