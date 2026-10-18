@@ -52,12 +52,13 @@
   <div class="agent-options"><button id="openai-api-toggle" type="button" aria-expanded="false" aria-controls="openai-api-form">OpenAI-compatible API</button><button id="invite-agent-toggle" type="button" aria-expanded="false" aria-controls="invite-agent-form">Invite agent</button></div>
   <button id="agent-connect" type="button">Connect agent</button><button id="agent-disconnect" type="button" hidden>Disconnect</button>
  </div>
+ <p id="agent-connection-error" class="hint" role="alert" hidden></p>
  <form id="openai-api-form" class="agent-form" hidden autocomplete="off">
   <label class="rowlabel">Base URL <input id="openai-base" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://api.openai.com/v1" required></label>
   <label class="rowlabel">API key <input id="openai-key" type="password" autocomplete="off" spellcheck="false" placeholder="stays on this computer" required></label>
   <label class="rowlabel">Model <input id="openai-model" type="text" autocomplete="off" spellcheck="false" placeholder="model id" required></label>
   <label class="rowlabel">Vision model <input id="openai-vision" type="text" autocomplete="off" spellcheck="false" placeholder="optional"></label>
-  <p class="hint">Chat completions. The key stays in the adapter until disconnect or restart, not in the browser.</p>
+  <p class="hint">Start the backend with <code>npm run api</code> before connecting. Chat completions. The key stays in the adapter until disconnect or restart, not in the browser.</p>
   <div class="control-row"><button type="submit">Use API</button><button id="openai-api-cancel" type="button">Cancel</button></div>
  </form>
  <form id="invite-agent-form" class="agent-form" hidden autocomplete="off">

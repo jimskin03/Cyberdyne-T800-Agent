@@ -92,6 +92,8 @@ A static deployment (`dist/` on any web server) has no `/llm` backend, so the sc
 
 If the character does not answer, check the status below the chat input: **AI off** means AI mind is not selected, and **AI unavailable** means the backend is not reachable. Background thinking defaults to once every 30 wall-clock seconds, and direct questions take priority.
 
+When opening the scene over Tailscale or a private network, run the API backend on the dev-server machine and set `API_ALLOWED_ORIGINS` in its ignored local `.env` to the exact scene origin you open. Restart `npm run api` after changing it. See [private network setup and connection errors](docs/API-INTEGRATION.md#using-the-scene-over-tailscale-or-another-private-network).
+
 ## Continuous integration
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request using Node 22. It runs `npm ci`, installs Playwright Chromium, then runs `npm test`, `npm run test:browser`, `npm run brain:validate`, `npm run build`, `npm run privacy:check`, and `npm audit`. Browser failure traces are uploaded as an artifact. The older [workflow example](docs/ci-workflow.example.yml) remains as a minimal reference.

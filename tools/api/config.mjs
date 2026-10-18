@@ -5,18 +5,27 @@ export function agentLabel(value){
 }
 const blank=value=>!String(value??'').trim();
 const reject=(status,message)=>{throw Object.assign(Error(message),{status});};
+function allowedSceneOrigins(value){
+ const origins=String(value||'').split(/[\s,]+/).filter(Boolean).map(value=>{
+  let url;try{url=new URL(value);}catch{throw Error('API_ALLOWED_ORIGINS must contain exact HTTP or HTTPS origins.');}
+  if(!['http:','https:'].includes(url.protocol)||url.hostname.includes('*')||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw Error('API_ALLOWED_ORIGINS must contain exact HTTP or HTTPS origins without wildcards, credentials, paths, queries, or fragments.');
+  return url.origin;
+ });
+ return [...new Set(origins)];
+}
 function unconfigured(env){
  return {configured:false,endpoint:'',key:'',textModel:'',visionModel:'',creativeModel:'',agentName:agentLabel(env.AGENT_NAME),authMode:'none',oauth:null,source:'none',kind:'none',alternative:null,host:''};
 }
 export function apiConfiguration(env=process.env){
+ const allowedOrigins=allowedSceneOrigins(env.API_ALLOWED_ORIGINS);
  const authMode=String(env.API_AUTH_MODE||'api-key').trim();
  const idle=blank(env.API_BASE_URL)&&blank(env.API_TEXT_MODEL)&&blank(env.API_KEY)&&blank(env.API_VISION_MODEL)&&blank(env.API_CREATIVE_MODEL)&&blank(env.OAUTH_AUTHORIZATION_URL)&&blank(env.OAUTH_TOKEN_URL)&&blank(env.OAUTH_CLIENT_ID)&&blank(env.OAUTH_CLIENT_SECRET)&&blank(env.OAUTH_SCOPE)&&(blank(env.API_AUTH_MODE)||authMode==='api-key');
- if(idle)return unconfigured(env);
+ if(idle)return {...unconfigured(env),allowedOrigins};
  if(!['api-key','oauth','none'].includes(authMode))throw Error('API_AUTH_MODE must be api-key, oauth, or none.');
  if(!env.API_BASE_URL||!env.API_TEXT_MODEL)throw Error('Set API_BASE_URL and API_TEXT_MODEL in your local .env.');
  const base=safeEndpoint(env.API_BASE_URL,'API_BASE_URL');
  if(base.search)throw Error('API_BASE_URL must not contain queries.');
- return {configured:true,endpoint:base.href.replace(/\/$/,'')+'/chat/completions',key:env.API_KEY||'',textModel:env.API_TEXT_MODEL,visionModel:env.API_VISION_MODEL||'',creativeModel:env.API_CREATIVE_MODEL||'',agentName:agentLabel(env.AGENT_NAME),authMode,oauth:authMode==='oauth'?oauthConfiguration(env):null,source:'env',kind:'configured',alternative:authMode==='oauth'?'sign-in':authMode==='none'?'local':'api-key',host:base.hostname};
+ return {configured:true,endpoint:base.href.replace(/\/$/,'')+'/chat/completions',key:env.API_KEY||'',textModel:env.API_TEXT_MODEL,visionModel:env.API_VISION_MODEL||'',creativeModel:env.API_CREATIVE_MODEL||'',agentName:agentLabel(env.AGENT_NAME),authMode,oauth:authMode==='oauth'?oauthConfiguration(env):null,source:'env',kind:'configured',alternative:authMode==='oauth'?'sign-in':authMode==='none'?'local':'api-key',host:base.hostname,allowedOrigins};
 }
 function cleanModel(value,message){
  if(typeof value!=='string')reject(400,message);

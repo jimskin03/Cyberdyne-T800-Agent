@@ -39,6 +39,20 @@ With the adapter running, the **MIND** section offers two ways to connect withou
 
 Chat requests still cannot choose an upstream URL, model ID, or authorization header. Only `POST /llm/connection` can change the active endpoint, and it uses the same checks as `.env`: HTTPS, or HTTP on loopback, with no credentials or query in the URL, and no loopback URL that points at the adapter itself.
 
+### Using the scene over Tailscale or another private network
+
+Run `npm run api` on the same machine as `npm run dev`. The browser uses that machine's same-origin `/llm` development proxy; keep the API adapter bound to `127.0.0.1:18081`.
+
+The adapter accepts scene origins `http://127.0.0.1:5340` and `http://localhost:5340` by default. To use a Tailscale IP or hostname, put the exact browser origin in your ignored local `.env`:
+
+```dotenv
+API_ALLOWED_ORIGINS=http://your-machine.your-tailnet.ts.net:5340
+```
+
+Replace the example with your own scheme, hostname or IP, and port. Multiple origins may be separated by commas. Do not include a page path, wildcard, credentials, query, or fragment. Restart `npm run api` after changing this setting. The allowlist stays on the server and cannot be changed through the connection form. Only allow scene origins you control: users of an allowed scene can configure and use the adapter.
+
+If the connection form reports **Scene origin is not allowed**, check this setting. **Agent adapter is unavailable** means to start or restart `npm run api` alongside the dev server. A static site without a same-origin `/llm` backend cannot connect by entering a provider URL alone. Connection errors remain visible near the form, and the key field is cleared after submission; enter it again when retrying.
+
 ## OAuth sign-in
 
 OAuth requires a service that supports an application you can register, the required API scopes, authorization-code exchange and PKCE. A consumer sign-in or paid subscription alone does not establish API access. Use the service's official application-registration instructions and register the exact loopback callback URL `http://127.0.0.1:18081/auth/callback`.
