@@ -73,4 +73,4 @@ See [RELEASE-REVIEW.md](RELEASE-REVIEW.md) for cleanup details and remaining rel
 
 ## Continuous integration
 
-A ready-to-use GitHub Actions workflow is provided in [docs/ci-workflow.example.yml](docs/ci-workflow.example.yml). Copy it to `.github/workflows/ci.yml` using a GitHub session authorized to manage workflows. It runs tests, brain validation, build, privacy checks and the dependency audit.
+The checked-in GitHub Actions workflow runs Node tests, mocked Chromium smoke coverage, brain validation, the production build, privacy checks, and the dependency audit. See [the refactor baseline](docs/refactor-baseline.md) for the flows and measurements that should stay stable during the staged refactor. The older [workflow example](docs/ci-workflow.example.yml) remains as a minimal reference.
