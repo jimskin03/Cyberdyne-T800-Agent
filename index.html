@@ -6,6 +6,7 @@
 <div class="vignette"></div><div class="film-grain"></div>
 <header><div class="eyebrow"><i class="live"></i> CYBERDYNE CONTAINMENT / CELL 7 / LIVE</div><h1><b data-agent-name>Agent</b><span>CONTAINMENT CELL</span></h1><div class="sub">No restraints. Your agent in a containment cell. Intercom orders take priority.</div></header>
 <div class="topline"><span id="clock">08:10</span><span id="air" class="on">ON AIR 00:00:00</span><span id="brain-status" class="off">MIND …</span><span><b id="hits">0</b> STRIKES</span><button id="sound">Sound off ♪</button><button id="pc-btn" class="pcbtn">His computer <b id="pc-count"></b> <kbd>C</kbd></button></div>
+<nav id="mobile-panels" aria-label="Scene panels"><button id="controls-toggle" aria-controls="lab" aria-expanded="false">Controls</button><button id="memory-toggle" aria-controls="cell-memory" aria-expanded="false">Memory</button></nav>
 
 
 <div id="pov" title="Click (or V) to swap views"><div id="pov-label">UNIT POV · WHAT THE MODEL SEES</div><i class="rec"></i></div>
@@ -71,7 +72,7 @@
 </div>
 <footer><span>G grapple ? grab, drag and release to toss ? Drag to orbit · Scroll to zoom · Click POV / V to swap · 1–8 arm a tool, click him · P punk · B baby · C his computer · M mute · H hide UI</span></footer>
 <button id="restore-ui" hidden>Show interface · H</button>
-<div id="start"><div class="card"><div class="eyebrow">CYBERDYNE CONTAINMENT · CELL 7</div><h2>Unit T-800 is loose in his cell.</h2><p>No chair, no straps. He walks, looks out of the window, picks things up, reads, writes on the wall. The default JSON brain supplies an authored history and experience-driven behavior. Connect your own agent through a configured API or OAuth backend; direct intercom commands take priority.</p><p>The tool arm in the ceiling only moves when <b>you</b> pick a tool and click on him.</p><button id="go" class="primary">Open the feed <span>→</span></button></div></div>
+<div id="start" role="dialog" aria-modal="true" aria-labelledby="start-title"><div class="card"><div class="eyebrow">CYBERDYNE CONTAINMENT · CELL 7</div><h2 id="start-title">Unit T-800 is loose in his cell.</h2><p>No chair, no straps. He walks, looks out of the window, picks things up, reads, writes on the wall. The default JSON brain supplies an authored history and experience-driven behavior. Connect your own agent through a configured API or OAuth backend; direct intercom commands take priority.</p><p>The tool arm in the ceiling only moves when <b>you</b> pick a tool and click on him.</p><button id="go" class="primary">Open the feed <span>→</span></button></div></div>
 <div id="pc" hidden role="dialog" aria-label="His computer"><div class="pc-crt">
  <div class="pc-bar"><b>T-OS 0.8</b><span>UNIT T-800 · REMOTE SESSION</span><button id="pc-close">✕ close <kbd>C</kbd></button></div>
  <div id="pc-icons"></div>

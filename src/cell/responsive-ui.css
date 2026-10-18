@@ -1,0 +1,52 @@
+/* Modal layers must stay above the brain's independently mounted WebGL panel. */
+#start{z-index:20;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));overflow:auto}
+#start .card{width:min(470px,100%);max-height:100%;overflow:auto;overscroll-behavior:contain}
+body:not(.feed-started) .json-brain[data-context=cell]{visibility:hidden}
+#pc{z-index:15}
+#fatal{z-index:30}
+#mobile-panels,.mobile-panel-heading{display:none}
+.askrow,#ask{min-width:0}
+
+@media(max-width:760px),(max-height:500px){
+ header,#monitor,footer,#mindpanel{display:none}
+ .topline{top:max(8px,env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));transform:none;max-width:none;flex-wrap:wrap;gap:6px 10px;white-space:normal;padding:8px;z-index:4;letter-spacing:0}
+ #brain-status{max-width:100%;overflow-wrap:anywhere}
+ .topline button,#mobile-panels button{min-height:40px;font-size:12px}
+ #mobile-panels{position:fixed;top:var(--compact-top,110px);left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));display:flex;gap:8px;z-index:9;pointer-events:none}
+ #mobile-panels button{pointer-events:auto;background:#111c22f5}
+ #mobile-panels button[aria-expanded=true]{border-color:var(--cy);color:var(--cy)}
+ #lab,.json-brain[data-context=cell]{display:none;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));top:calc(var(--compact-top,110px) + 48px);bottom:calc(12px + env(safe-area-inset-bottom) + var(--ui-bottom,0px));width:auto;max-width:380px;max-height:none;transform:none;overflow:auto;overscroll-behavior:contain;padding:12px;z-index:10;background:#0c171ff5}
+ body.controls-open #lab,body.memory-open .json-brain[data-context=cell]{display:block}
+ .mobile-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;font:12px var(--mono);color:#c9e8df}
+ #lab button,.json-brain[data-context=cell] button{min-height:44px;font-size:12px}
+ #lab input[type=checkbox]{width:20px;height:20px}
+ #lab input[type=range]{min-height:32px}
+ #lab select,.json-brain[data-context=cell] select{min-height:40px;max-width:100%;font-size:12px}
+ #lab .control-row{flex-wrap:wrap}
+ #lab .control-row button{flex:1 1 100px}
+ #lab .check,#lab .rowlabel,#lab .slide,#lab .hint{font-size:11px}
+ .json-brain[data-context=cell] .jb-viewport{height:clamp(120px,28dvh,240px)}
+ .json-brain[data-context=cell] .jb-tools{flex-wrap:wrap}
+ .json-brain[data-context=cell] .jb-count{display:none}
+ #bottom{left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:calc(8px + env(safe-area-inset-bottom) + var(--ui-bottom,0px));gap:5px;z-index:3;max-height:45dvh;overflow:auto;overscroll-behavior:contain}
+ #thought-row{font-size:11px;max-height:50px;overflow:auto}
+ #dialogue{padding:8px 10px;max-height:120px;overflow:auto}
+ #dialogue p{font-size:14px}
+ #ask{font-size:16px;min-height:44px;width:0;padding:8px}
+ #ask-btn{min-height:44px}
+ #reply-status{font-size:9px;line-height:1.4;margin:0;text-align:center}
+ #pov{top:calc(var(--compact-top,110px) + 48px);bottom:auto;right:max(12px,env(safe-area-inset-right));width:min(38vw,190px);z-index:2}
+ #pov-label{letter-spacing:.3px;font-size:7px}
+ #start .card{padding:20px}
+ #start h2{font-size:22px}
+ #toast{bottom:calc(190px + var(--ui-bottom,0px));max-width:calc(100vw - 24px);z-index:12}
+ .pc-crt{width:calc(100% - 24px);height:calc(100dvh - 24px);border-width:6px;border-radius:12px}
+ .pc-bar{flex-wrap:wrap;gap:6px}
+ .pc-bar span{font-size:9px}
+ #pc-close{min-height:40px}
+ #pc-win{inset:90px 8px 8px}
+ .pc-winbar{flex-wrap:wrap}
+ .pc-winbar b{min-width:0;overflow-wrap:anywhere}
+ body.clean #mobile-panels,body.clean #lab,body.clean .json-brain[data-context=cell],body.pc-open #mobile-panels,body.pc-open #lab,body.berserker-mode #mobile-panels,body.berserker-mode .json-brain[data-context=cell]{display:none}
+ #restore-ui{bottom:max(12px,env(safe-area-inset-bottom));min-height:44px;z-index:11}
+}
