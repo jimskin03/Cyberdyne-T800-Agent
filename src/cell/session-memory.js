@@ -1,9 +1,10 @@
 import {describeMemory} from './sensory-memory.js';
+import {createId} from './id.js';
 // Fictional character progression, not a clinical model. Stored inside cell.json.
 const finite=(n,fallback=0)=>Number.isFinite(n)?n:fallback;
 const clamp=(n,a=0,b=100)=>Math.min(b,Math.max(a,finite(n)));
 const fresh=now=>({version:1,createdAt:now,updatedAt:now,totals:{activeSeconds:0,distressSeconds:0,calmSeconds:0,stressDose:0,observedPainEvents:0,sessions:0},psyche:{sanity:100,peakErosion:0},sessions:[],episodes:[],legacy:null});
-export function createSessionMemory(saved,{now=()=>Date.now(),id=()=>crypto.randomUUID()}={}){
+export function createSessionMemory(saved,{now=()=>Date.now(),id=createId}={}){
  let data=fresh(now()),session=null,last=null,cursor=0;
  function restore(value,legacy){
   data=fresh(now());session=null;last=null;

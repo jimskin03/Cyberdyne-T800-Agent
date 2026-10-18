@@ -4,6 +4,7 @@ import {createBodyLoadSampler} from './body-loads.js';
 import {createNervousHud} from './nervous-hud.js';
 import {recallSensoryMemory, describeMemory} from './sensory-memory.js';
 import {createSessionMemory} from './session-memory.js';
+import {createId} from './id.js';
 import {createLifeMemory} from './life-memory.js';
 import lifeGraph from './default-brain.json';
 import {createBerserker} from './berserker.js';
@@ -136,7 +137,7 @@ const nervous = createNervousSystem(),
   loadSampler = createBodyLoadSampler();
 const nerveHud = createNervousHud(nervous, cognitive);
 let memoryOutbox = [],
-  activeSession = crypto.randomUUID();
+  activeSession = createId();
 const feeling = () => ({
   body: nervous.snapshot(),
   mental: cognitive.snapshot(),
@@ -324,7 +325,7 @@ try {
       if (!spec) throw Error('The 3D design did not arrive');
       const result = await buildCreation(spec.code, {signal: a.token?.signal});
       if (a.token?.cancelled || a.token?.signal?.aborted) throw INTERRUPT;
-      const id = current?.id || 'creation_' + crypto.randomUUID().replaceAll('-', '');
+      const id = current?.id || 'creation_' + createId().replaceAll('-', '');
       if (body.st.holding?.id === id) body.release();
       const item = world.addCreation(
         {id, name: spec.name || a.name || 'Untitled', description: spec.description},
@@ -550,7 +551,7 @@ function journal(kind, text, details = {}) {
   if (!text) return;
   const context = feeling(),
     entry = {
-      id: crypto.randomUUID(),
+      id: createId(),
       session: activeSession,
       at: Date.now(),
       t: hh(state.simMin),
@@ -592,7 +593,7 @@ function addEvent(kind, text, urgent = false) {
   if (kind === 'intercom') {
     cognitive.contact();
     lifeMemory.experience.observeDialogue(text, {
-      id: crypto.randomUUID(),
+      id: createId(),
       actor: 'operator',
       choice: state.lastSaid || '',
     });
@@ -747,7 +748,7 @@ function painHint() {
 function recordHurt(text, amount = 0, part = 'body', tool = 'impact') {
   if (inPeace()) return;
   lifeMemory.experience.observe({
-    id: crypto.randomUUID(),
+    id: createId(),
     actor: 'operator',
     kind: 'harm',
     source: 'world',
