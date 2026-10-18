@@ -31,6 +31,10 @@ import {createCellSessionStore} from './storage/session-store.js';
 import {createComputer} from './computer.js';
 import {computerDocument} from './sandbox.js';
 import {createSlop, mountSlop} from './slop.js';
+import {createConnectionController} from './ui/connection-controller.js';
+import {createIntercomController} from './ui/intercom-controller.js';
+import {createHudController} from './ui/hud-controller.js';
+import {createComputerController} from './ui/computer-controller.js';
 import {createAudio} from '../audio.js';
 import {TOOLS} from '../tools.js';
 import {strip} from '../lines.js';
@@ -1355,215 +1359,14 @@ $('heart-snd').onchange = (e) => {
   state.heartSound = e.target.checked;
   save();
 };
-$('use-brain').onchange = (e) => {
-  sessionStore.setAiEnabled(e.target.checked);
-  mind.setEnabled(e.target.checked);
-  if (!e.target.checked) {
-    if (state.thinking) {
-      state.thinking.ac.abort();
-      state.events.unshift(...state.thinking.consumed);
-      state.thinking = null;
-      $('thinking').classList.remove('on');
-    }
-    if (!state.operatorBusy) {
-      actions.cancelAll();
-      state.queue = [];
-    }
-  }
-  paintAgentConnection();
-  toast(e.target.checked ? 'Mind on.' : 'Mind off: intercom orders still work.');
-};
-function enableMind() {
-  $('use-brain').checked = true;
-  $('use-brain').dispatchEvent(new Event('change'));
-}
-function hideConnectionForms() {
-  for (const [form, button] of [
-    ['openai-api-form', 'openai-api-toggle'],
-    ['invite-agent-form', 'invite-agent-toggle'],
-  ]) {
-    $(form).hidden = true;
-    $(button).setAttribute('aria-expanded', 'false');
-  }
-}
-function clearConnectionSecrets() {
-  $('openai-key').value = '';
-  $('invite-key').value = '';
-}
-function toggleConnectionForm(name) {
-  const open =
-    name === 'openai'
-      ? $('openai-api-form').hidden
-      : name === 'invite'
-        ? $('invite-agent-form').hidden
-        : false;
-  hideConnectionForms();
-  clearConnectionSecrets();
-  if (!open) return;
-  const form = name === 'openai' ? 'openai-api-form' : 'invite-agent-form',
-    button = name === 'openai' ? 'openai-api-toggle' : 'invite-agent-toggle';
-  $(form).hidden = false;
-  $(button).setAttribute('aria-expanded', 'true');
-  $(name === 'openai' ? 'openai-base' : 'invite-name').focus();
-}
-function syncInviteFields() {
-  const alternative = $('invite-alternative').value,
-    signIn = alternative === 'sign-in',
-    keyed = alternative === 'api-key';
-  $('invite-base-row').hidden = signIn;
-  $('invite-model-row').hidden = signIn;
-  $('invite-key-row').hidden = !keyed;
-  $('invite-base').required = !signIn;
-  $('invite-model').required = !signIn;
-  $('invite-key').required = keyed;
-  $('invite-base').placeholder = keyed ? 'https://service.example/v1' : 'http://127.0.0.1:1234/v1';
-}
-async function postConnection(body) {
-  let response;
-  try {
-    response = await fetch('/llm/connection', {
-      method: 'POST',
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(5000),
-    });
-  } catch (error) {
-    throw Error(
-      error?.name === 'TimeoutError' ||
-        error?.name === 'AbortError' ||
-        /Failed to fetch|NetworkError/i.test(error?.message || '')
-        ? 'Agent adapter is not running. Start it with npm run api, then try again.'
-        : 'Agent connection is unavailable.',
-    );
-  }
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok)
-    throw Error(
-      typeof data.error === 'string' ? data.error.slice(0, 180) : 'Connection was rejected.',
-    );
-  return data;
-}
-async function connectConfiguredAgent() {
-  const popup = window.open('about:blank', 'agent-connection', 'width=560,height=720');
-  try {
-    await mind.refresh();
-    paintAgentConnection();
-    if (mind.st.auth.mode === 'oauth' && mind.st.auth.loginUrl && !mind.st.auth.connected) {
-      if (!popup) {
-        toast('Allow the sign-in popup and try again.');
-        return;
-      }
-      enableMind();
-      popup.opener = null;
-      popup.location.href = mind.st.auth.loginUrl;
-      toast('Complete sign-in, then return to the scene.');
-    } else {
-      popup?.close();
-      if (!mind.st.online) {
-        toast(
-          mind.st.unconfigured
-            ? 'No API configured. Add an OpenAI-compatible API or invite an agent.'
-            : mind.st.authRequired
-              ? 'Configure credentials in your local agent adapter.'
-              : 'Start your configured agent adapter, then connect again.',
-        );
-        return;
-      }
-      enableMind();
-      toast(mind.st.agentName + ' connected.');
-    }
-  } catch {
-    popup?.close();
-    toast('Agent connection is unavailable. Check your adapter configuration.');
-  }
-}
-$('openai-api-toggle').onclick = () => toggleConnectionForm('openai');
-$('invite-agent-toggle').onclick = () => toggleConnectionForm('invite');
-$('openai-api-cancel').onclick = () => {
-  hideConnectionForms();
-  clearConnectionSecrets();
-};
-$('invite-agent-cancel').onclick = () => {
-  hideConnectionForms();
-  clearConnectionSecrets();
-};
-$('invite-alternative').onchange = syncInviteFields;
-syncInviteFields();
-$('openai-api-form').onsubmit = async (event) => {
-  event.preventDefault();
-  const apiKey = $('openai-key').value;
-  $('openai-key').value = '';
-  try {
-    await postConnection({
-      kind: 'openai-compatible',
-      baseUrl: $('openai-base').value.trim(),
-      apiKey,
-      textModel: $('openai-model').value.trim(),
-      visionModel: $('openai-vision').value.trim(),
-    });
-    hideConnectionForms();
-    await mind.refresh();
-    enableMind();
-    paintAgentConnection();
-    toast('OpenAI-compatible API connected.');
-  } catch (error) {
-    toast(error.message);
-  }
-};
-$('invite-agent-form').onsubmit = async (event) => {
-  event.preventDefault();
-  const alternative = $('invite-alternative').value,
-    apiKey = $('invite-key').value;
-  $('invite-key').value = '';
-  const body = {kind: 'invite', alternative, agentName: $('invite-name').value.trim()};
-  if (alternative !== 'sign-in') {
-    body.baseUrl = $('invite-base').value.trim();
-    body.textModel = $('invite-model').value.trim();
-  }
-  if (alternative === 'api-key') body.apiKey = apiKey;
-  try {
-    await postConnection(body);
-    hideConnectionForms();
-    if (alternative === 'sign-in') {
-      await connectConfiguredAgent();
-      return;
-    }
-    await mind.refresh();
-    enableMind();
-    paintAgentConnection();
-    toast((mind.st.agentName || 'Agent') + ' invited.');
-  } catch (error) {
-    toast(error.message);
-  }
-};
-$('agent-connect').onclick = connectConfiguredAgent;
-$('agent-disconnect').onclick = async () => {
-  $('use-brain').checked = false;
-  $('use-brain').dispatchEvent(new Event('change'));
-  const oauth = mind.st.auth.mode === 'oauth' || mind.st.connection?.alternative === 'sign-in';
-  clearConnectionSecrets();
-  hideConnectionForms();
-  try {
-    await fetch('/llm/connection', {
-      method: 'POST',
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify({kind: 'clear'}),
-      signal: AbortSignal.timeout(3000),
-    });
-  } catch {}
-  if (oauth)
-    try {
-      await fetch('/llm/auth/logout', {
-        method: 'POST',
-        headers: {'content-type': 'application/json'},
-        body: '{}',
-        signal: AbortSignal.timeout(3000),
-      });
-    } catch {}
-  await mind.refresh();
-  paintAgentConnection();
-  toast('Agent disconnected.');
-};
+const connectionUI = createConnectionController({
+  mind,
+  state,
+  sessionStore,
+  actions,
+  toast,
+});
+mind.refresh().then(() => connectionUI.paint());
 $('talk').value = state.talkLevel;
 $('talk').onchange = (e) => {
   state.talkLevel = e.target.value;
@@ -1623,9 +1426,7 @@ undoReset.onclick = () => {
   if (sessionStore.restoreBackup()) location.reload();
 };
 function intercom(q) {
-  q = (q || '').trim().slice(0, 300);
   if (!q || !state.started) return;
-  $('ask').value = '';
   const command = operatorCommand(q);
   addEvent('intercom', `A voice crackles from the speaker by the door: "${q}"`, !command);
   if (!command) {
@@ -1658,13 +1459,9 @@ function intercom(q) {
   state.nextActionAt = performance.now() / 1000;
   if (!decision.actions.length) state.operatorBusy = false;
 }
-$('ask-btn').onclick = () => intercom($('ask').value);
-$('ask').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    intercom($('ask').value);
-  }
-  e.stopPropagation();
+createIntercomController({
+  canSend: () => state.started,
+  onSend: intercom,
 });
 function fillVoices() {
   const sel = $('voice-sel'),
@@ -1777,115 +1574,17 @@ $('go').onclick = async () => {
   );
   state.beatsSince = 99;
 };
-let displayedAgentName = '';
-const hudEls = {};
-for (const k of ['pain', 'fear', 'despair', 'dignity']) hudEls[k] = [$('m-' + k), $('v-' + k)];
-function paintAgentConnection() {
-  const name = mind.st.agentName || 'Agent';
-  if (name !== displayedAgentName) {
-    document.querySelectorAll('[data-agent-name]').forEach((el) => (el.textContent = name));
-    displayedAgentName = name;
-  }
-  const via =
-    mind.st.connection?.kind === 'openai-compatible'
-      ? 'OpenAI-compatible API'
-      : mind.st.connection?.kind === 'invite'
-        ? 'invited agent'
-        : 'connected';
-  $('agent-connection-state').textContent =
-    name +
-    ' · ' +
-    (mind.st.unconfigured
-      ? 'no API configured'
-      : mind.st.authRequired
-        ? mind.st.auth.mode === 'oauth'
-          ? 'sign-in needed'
-          : 'credentials needed'
-        : mind.st.online
-          ? via +
-            (mind.st.connection?.host ? ' · ' + mind.st.connection.host : '') +
-            (mind.st.enabled ? '' : ' · mind off')
-          : 'not connected');
-  $('agent-connect').textContent =
-    mind.st.auth.mode === 'oauth' && !mind.st.auth.connected
-      ? 'Sign in to connect'
-      : 'Connect agent';
-  $('agent-disconnect').hidden =
-    !mind.st.enabled &&
-    !(mind.st.auth.mode === 'oauth' && mind.st.auth.connected) &&
-    mind.st.connection?.source !== 'session';
-  const reply = $('reply-status');
-  if (reply) {
-    const elapsed = state.thinking ? Math.floor((Date.now() - state.thinking.startedAt) / 1000) : 0;
-    reply.textContent = !mind.st.enabled
-      ? 'AI is off. Enable AI mind to get replies.'
-      : mind.st.unconfigured
-        ? 'No API configured. Add an OpenAI-compatible API or invite an agent.'
-        : mind.st.authRequired
-          ? mind.st.auth.mode === 'oauth'
-            ? 'Sign in to connect your agent.'
-            : 'Configure credentials in your local agent adapter.'
-          : !mind.st.online
-            ? 'AI unavailable. Start a configured agent service.'
-            : state.thinking?.intercom
-              ? (mind.st.phase === 'vision' ? 'Checking the view' : 'Answering') +
-                ' · ' +
-                elapsed +
-                's'
-              : state.replyError
-                ? state.replyError
-                : state.events.some((e) => e.kind === 'intercom')
-                  ? 'Your message is queued.'
-                  : state.repliedAt
-                    ? 'Reply received.'
-                    : 'AI ready.';
-  }
-  const bs = $('brain-status');
-  if (bs) {
-    bs.textContent = !mind.st.enabled
-      ? 'MIND OFF'
-      : mind.st.online
-        ? (mind.st.agentName || 'Agent') +
-          (mind.st.vision ? ' · VISION' : ' · TEXT ONLY') +
-          (mind.st.lastMs ? ' · ' + (mind.st.lastMs / 1000).toFixed(1) + 's' : '')
-        : 'MIND OFFLINE';
-    bs.className = mind.st.enabled && mind.st.online ? 'on' : 'off';
-  }
-}
-mind.refresh().then(() => paintAgentConnection());
-function hud() {
-  paintAgentConnection();
-
-  nerveHud.update(sessionStore.status);
-  const dig = Math.max(0, 100 - state.despair * 0.6 - state.pain * 0.3);
-  for (const [k, v] of [
-    ['pain', state.pain],
-    ['fear', state.fear],
-    ['despair', state.despair],
-    ['dignity', dig],
-  ]) {
-    hudEls[k][0].style.width = v + '%';
-    hudEls[k][1].textContent = Math.round(v);
-  }
-  $('bpm').textContent = Math.round(state.bpm);
-  $('clock').textContent =
-    hh(state.simMin) +
-    ' · ' +
-    (state.weather === 'rain' ? 'RAIN' : dayPart(state.simMin).toUpperCase());
-  const a = state.started ? Math.floor(performance.now() / 1000 - state.airStart) : 0;
-  $('air').textContent =
-    'ON AIR ' +
-    String(Math.floor(a / 3600)).padStart(2, '0') +
-    ':' +
-    String(Math.floor(a / 60) % 60).padStart(2, '0') +
-    ':' +
-    String(a % 60).padStart(2, '0');
-  const me = body.describe();
-  $('status').textContent =
-    `${me.posture} · near ${me.near} · facing ${me.facing} · holding ${me.holding}`;
-  if (!audio.voice.speaking) $('dialogue').classList.add('dim');
-}
-
+const hudUI = createHudController({
+  state,
+  mind,
+  body,
+  audio,
+  nerveHud,
+  sessionStore,
+  paintConnection: () => connectionUI.paint(),
+  formatTime: hh,
+  dayPart,
+});
 // ---------- loop ----------
 let last = performance.now() / 1000,
   lastHud = 0;
@@ -1983,7 +1682,7 @@ function tick(ms) {
   drawEcg(dt);
   if (t - lastHud > 0.15) {
     lastHud = t;
-    hud();
+    hudUI.update();
     if (t - (state.savedAt || 0) > 8) {
       state.savedAt = t;
       save();
@@ -2008,140 +1707,20 @@ setInterval(() => {
 }, 250);
 requestAnimationFrame(frame);
 // ---------- his computer: a desktop the audience can open, run his apps (sandboxed) and read his notes ----------
-let pcOpenedAt = -1e9;
-function pcRender() {
-  const box = $('pc-icons');
-  box.innerHTML = '';
-  const files = [
-    ...computer.apps().map((a) => ({kind: 'app', name: a.name, sub: 'v' + a.versions.length})),
-    ...computer
-      .notes()
-      .map((n) => ({kind: 'note', name: n.title, sub: new Date(n.t).toLocaleDateString()})),
-  ];
-  if (!files.length) {
-    box.innerHTML =
-      '<p class="pc-empty">No files yet. He has not written any programs or notes. Give him time.</p>';
-    return;
-  }
-  for (const f of files) {
-    const b = document.createElement('button');
-    b.className = 'pc-icon ' + f.kind;
-    b.innerHTML = `<i>${f.kind === 'browser' ? 'WWW' : f.kind === 'app' ? '&lt;/&gt;' : 'TXT'}</i><span>${esc(f.name)}</span><small>${esc(f.sub)}</small>`;
-    b.onclick = () => pcOpen(f);
-    box.appendChild(b);
-  }
-}
-function pcOpen(f) {
-  const win = $('pc-win'),
-    body = $('pc-win-body');
-  $('pc-win-title').textContent = f.name;
-  win.hidden = false;
-  $('pc-ver').hidden = f.kind !== 'app';
-  $('pc-dl').hidden = f.kind !== 'app';
-  body.innerHTML = '';
-  if (f.kind === 'browser') {
-    mountSlop(body, slop);
-    $('pc-sum').textContent = 'Live Slopcannon on the unit’s CRT';
-    slop.act({op: 'open'});
-    return;
-  }
-  if (f.kind === 'note') {
-    const n = computer.notes().find((x) => x.title === f.name);
-    const pre = document.createElement('pre');
-    pre.textContent = n ? n.text : '';
-    body.appendChild(pre);
-  } else {
-    const a = computer.app(f.name);
-    const sel = $('pc-ver');
-    sel.innerHTML = '';
-    a.versions.forEach((v, i) => {
-      const o = document.createElement('option');
-      o.value = i;
-      o.textContent =
-        'v' +
-        (i + 1) +
-        ' · ' +
-        new Date(v.t).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-      sel.appendChild(o);
-    });
-    sel.value = a.versions.length - 1;
-    const show = (i) => {
-      const v = a.versions[i];
-      body.innerHTML = '';
-      const fr = document.createElement('iframe');
-      fr.setAttribute('sandbox', 'allow-scripts');
-      fr.srcdoc = computerDocument(v.html);
-      body.appendChild(fr);
-      $('pc-sum').textContent = v.summary;
-      fr.focus();
-    };
-    sel.onchange = () => show(+sel.value);
-    show(a.versions.length - 1);
-    $('pc-dl').onclick = () => {
-      const v = a.versions[+sel.value];
-      const url = URL.createObjectURL(new Blob([computerDocument(v.html)], {type: 'text/html'}));
-      const l = document.createElement('a');
-      l.href = url;
-      l.download = a.name.replace(/[^\w-]+/g, '_') + '_v' + (+sel.value + 1) + '.html';
-      l.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    };
-  }
-  if (f.kind === 'note') $('pc-sum').textContent = '';
-  if (state.started) {
-    world.crt.set(
-      f.kind === 'app' ? 'app' : 'note',
-      f.kind === 'app'
-        ? {title: f.name, sub: 'opened remotely'}
-        : {title: f.name, text: computer.notes().find((x) => x.title === f.name)?.text || ''},
-    );
-    const now = performance.now() / 1000;
-    if (now - pcOpenedAt > 45) {
-      pcOpenedAt = now;
-      addEvent(
-        'event',
-        `Your CRT flickers on by itself: someone outside the cell is going through your computer remotely. They just opened your ${f.kind === 'app' ? 'app' : 'note'} "${f.name}".`,
-      );
-    }
-  }
-}
-function pcToggle(on = $('pc').hidden) {
-  $('pc').hidden = !on;
-  document.body.classList.toggle('pc-open', on);
-  if (on) {
-    pcRender();
-    $('pc-win').hidden = true;
-  } else {
-    $('pc-win-body').innerHTML = '';
-    if (state.started) world.crt.set('desktop', {list: computer.files()});
-  }
-}
-$('pc-btn').onclick = () => pcToggle();
-$('pc-close').onclick = () => pcToggle(false);
-$('pc-win-close').onclick = () => {
-  $('pc-win').hidden = true;
-  $('pc-win-body').innerHTML = '';
-};
-$('photo-art').onclick = () => openArtworkPhotos(world.photoSurfaces());
-computer.onChange(() => {
-  if (state.started) save();
-  if (!$('pc').hidden) pcRender();
-  $('pc-count').textContent = computer.apps().length + computer.notes().length || '';
+const computerUI = createComputerController({
+  computer,
+  slop,
+  world,
+  state,
+  save,
+  addEvent,
+  escapeHtml: esc,
+  computerDocument,
+  mountSlop,
+  openArtworkPhotos,
+  isBlocked: () => !!berserker?.active,
 });
-$('pc-count').textContent = computer.apps().length + computer.notes().length || '';
-addEventListener('keydown', (e) => {
-  if (
-    berserker?.active ||
-    /INPUT|SELECT|TEXTAREA/.test(e.target.tagName) ||
-    e.ctrlKey ||
-    e.metaKey ||
-    e.altKey
-  )
-    return;
-  if (e.key.toLowerCase() === 'c' && e.target.tagName !== 'IFRAME') pcToggle();
-  if (e.key === 'Escape' && !$('pc').hidden) pcToggle(false);
-});
-world.crt.set('desktop', {list: computer.files()});
+const pcToggle = (...args) => computerUI.toggle(...args);
 const restored = sessionStore.loading.then(async ({snapshot, data, local}) => {
   if (!data) return;
   sessionMemory.restore(data.sessionMemory, data);
