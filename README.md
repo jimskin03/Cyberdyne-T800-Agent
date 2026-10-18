@@ -7,6 +7,8 @@ A standalone Three.js containment-cell scene with a procedural robot, movable ob
 Requires Node.js 22.12 or newer and npm.
 
 ```sh
+git clone https://github.com/newbmechanix-ship-it/Cyberdyne-T800-Agent-Embodiment-Project.git
+cd Cyberdyne-T800-Agent-Embodiment-Project
 npm ci
 npm run dev
 ```
@@ -48,3 +50,7 @@ Sensation simulation and pulse animation stay local and continuous. Heartbeats d
 ## Publication status
 
 See [RELEASE-REVIEW.md](RELEASE-REVIEW.md) for cleanup details and remaining release decisions. The repository is initially private while the source license and bundled audio redistribution rights are finalized. The source ZIP contains only committed project files; API credentials and saved browser sessions are excluded.
+
+## Continuous integration
+
+A ready-to-use GitHub Actions workflow is provided in [docs/ci-workflow.example.yml](docs/ci-workflow.example.yml). Copy it to `.github/workflows/ci.yml` using a GitHub session authorized to manage workflows. It runs tests, brain validation, build, privacy checks and the dependency audit.

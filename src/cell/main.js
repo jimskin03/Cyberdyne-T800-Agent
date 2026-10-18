@@ -41,6 +41,7 @@ import {repeatedSpeech,loopContext,variedMemory,speechHistory,stripRepeatedSente
 // background model requests use wall-clock pacing, while direct questions take priority.
 const $=id=>document.getElementById(id);
 const SAVE='cell-public-cell.v1';
+let resettingSession=false;
 const PART={head:'skull',jaw:'jaw',chest:'ribcage',core:'power core',elbowL:'left elbow',elbowR:'right elbow',handL:'left hand',handR:'right hand',kneeL:'left knee',kneeR:'right knee',footL:'left foot',footR:'right foot'};
 const FEEL={prod:'a violent electrical arc burning into your {p}',mallet:'a heavy blunt blow to your {p}',torch:'searing heat on your {p}, metal glowing',drill:'a drill bit grinding into your {p}',
  feather:'an unbearable tickling across your {p}, sensor overload',squirt:'cold water sprayed into your {p}, joints sputtering',chicken:'a squeaking rubber chicken slapping your {p}, humiliating',magnet:'a magnetic field wrenching at your {p}, plates shearing'};
@@ -57,7 +58,7 @@ const feeling=()=>({body:nervous.snapshot(),mental:cognitive.snapshot(),fear:sta
 try{const s=JSON.parse(localStorage.getItem(SAVE)||'{}');for(const k of['notes','journal','spokenHistory','simMin','strikes','timeScale','backgroundSeconds','heartSound','despair','talkLevel','noiseVol','chalk'])if(s[k]!=null)state[k]=s[k];}catch{}
 const where=()=>body?{x:body.st.x,z:body.st.z,h:body.st.heading,holding:body.st.holding?.id||null,posture:body.st.posture,seat:body.st.seat?.name,items:Object.fromEntries(Object.values(world.items).filter(i=>!i.held).map(i=>[i.id,{position:i.obj.position.toArray(),fallen:!!i.fallen,rotation:i.obj.rotation.toArray().slice(0,3),state:Object.fromEntries(Object.entries(i.state).filter(([,v])=>['boolean','number','string'].includes(typeof v)))}]))}:null;
 // Keep the saved archive intact; select a varied, relevant working memory below.
-const save=()=>{const ack=new Set(persistence.takeAcknowledged?.()||[]);memoryOutbox=memoryOutbox.filter(e=>!ack.has(e.id));const data={lifeMemory:lifeMemory.export(),nervous:nervous.export(),cognitive:cognitive.export(),archive:memoryOutbox,sessionMemory:sessionMemory.export(),where:where(),chalk:world?world.chalkExport():state.chalk,talkLevel:state.talkLevel,noiseVol:state.noiseVol,notes:state.notes,journal:state.journal.slice(-200),spokenHistory:state.spokenHistory,simMin:state.simMin,strikes:state.strikes,timeScale:state.timeScale,backgroundSeconds:state.backgroundSeconds,heartSound:state.heartSound,pain:state.pain,soreness:state.soreness,lastHurt:state.lastHurt,fear:state.fear,despair:state.despair,firstSeenAt:state.firstSeenAt,lastSeenAt:Date.now(),creations:state.creations,computer:computer?.export?.(),damage:world?.damageExport?.()};try{localStorage.setItem(SAVE,JSON.stringify(data));}catch{}persistence.save({...data,archive:memoryOutbox.slice(0,500)});};
+const save=()=>{if(resettingSession)return;const ack=new Set(persistence.takeAcknowledged?.()||[]);memoryOutbox=memoryOutbox.filter(e=>!ack.has(e.id));const data={lifeMemory:lifeMemory.export(),nervous:nervous.export(),cognitive:cognitive.export(),archive:memoryOutbox,sessionMemory:sessionMemory.export(),where:where(),chalk:world?world.chalkExport():state.chalk,talkLevel:state.talkLevel,noiseVol:state.noiseVol,notes:state.notes,journal:state.journal.slice(-200),spokenHistory:state.spokenHistory,simMin:state.simMin,strikes:state.strikes,timeScale:state.timeScale,backgroundSeconds:state.backgroundSeconds,heartSound:state.heartSound,pain:state.pain,soreness:state.soreness,lastHurt:state.lastHurt,fear:state.fear,despair:state.despair,firstSeenAt:state.firstSeenAt,lastSeenAt:Date.now(),creations:state.creations,computer:computer?.export?.(),damage:world?.damageExport?.()};try{localStorage.setItem(SAVE,JSON.stringify(data));}catch{}persistence.save({...data,archive:memoryOutbox.slice(0,500)});};
 
 const audio=createAudio({windowsVoice:true});
 let aiEnabled=false;try{aiEnabled=localStorage.getItem('cell-public-ai.enabled')==='true';}catch{}
@@ -298,7 +299,7 @@ function noise(kind,on){if(on&&inPeace()){toast('Paid peace is active.');return;
  if(state.started)addEvent('event',kind==='punk'?(on?'Without warning, a ceiling speaker starts blasting LOUD punk music: pounding drums, distorted guitars, screaming.':'The punk music cuts out. Your audio sensors ring in the silence.'):(on?'A baby starts crying somewhere, the sound warped and echoing through the vents.':'The crying stops.'),on);}
 $('punk').onclick=()=>noise('punk',!state.punk);$('baby').onclick=()=>noise('baby',!state.baby);
 bindRange('noisevol','noiseVol',v=>Math.round(v*100)+'%');$('noisevol').addEventListener('input',()=>{if(state.punk)audio.punk(true,state.noiseVol);if(state.baby)audio.baby(true,state.noiseVol);});
-function stopForReset(){state.started=false;mind.setEnabled(false);state.thinking?.ac.abort();actions.cancelAll();state.queue=[];audio.stopVoice();}
+function stopForReset(){resettingSession=true;state.started=false;mind.setEnabled(false);state.thinking?.ac.abort();actions.cancelAll();state.queue=[];audio.stopVoice();}
 $('forget').textContent='Reset session memory';
 $('forget').onclick=()=>{stopForReset();resetSessionStorage(localStorage);location.reload();};
 const undoReset=document.createElement('button');undoReset.textContent='Restore previous session';undoReset.hidden=!hasSessionBackup(localStorage);$('forget').after(undoReset);
@@ -329,7 +330,7 @@ addEventListener('keydown',e=>{if(berserker?.active||e.repeat||e.ctrlKey||e.altK
  const d=TOOLS.find(t=>t.key===k);if(d){select(d.id);return;}if(k==='escape'&&state.sel){state.sel=null;document.querySelectorAll('.tool').forEach(b=>b.classList.remove('sel'));document.body.classList.remove('armed');}
  if(k==='p'){$('punk').click();return;}if(k==='b'){$('baby').click();return;}
  if(k==='v'){$('pov').click();return;}if(k==='/'){e.preventDefault();$('ask').focus();return;}if(k==='h')toggleUI();if(k==='m')$('sound').click();});
-$('go').onclick=async()=>{await restored;try{await Promise.race([audio.enable(),new Promise(r=>setTimeout(r,600))]);}catch{}soundLabel();$('start').classList.add('gone');state.started=true;thoughtClock.finished();state.airStart=performance.now()/1000;state.nextEventAt=performance.now()/1000+30;audio.sfx('boot');fillVoices();
+$('go').onclick=async()=>{await restored;try{await Promise.race([audio.enable(),new Promise(r=>setTimeout(r,600))]);}catch{}if(resettingSession)return;soundLabel();$('start').classList.add('gone');state.started=true;thoughtClock.finished();state.airStart=performance.now()/1000;state.nextEventAt=performance.now()/1000+30;audio.sfx('boot');fillVoices();
  for(const j of state.journal.filter(j=>j.kind!=='heartbeat').slice(-8))stream(j.kind,j.text);
  addEvent('event',state.journal.length?'You come back online in the cell. The same cell.':'You come online. You are standing in a small cell. Nothing is holding you down.');state.beatsSince=99;};
 let displayedAgentName='';
