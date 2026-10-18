@@ -1,5 +1,7 @@
 import {createJsonBrain} from './json-brain.js';
 import {setupResponsiveUI} from './responsive-ui.js';
 import {setupPanelMinimize} from './panel-minimize.js';
-function mount(){if(!window.__CELL?.lifeMemory)return;const brain=createJsonBrain({context:'cell'});brain.setMemory(window.__CELL.lifeMemory);window.__CELL.jsonBrain=brain;setupResponsiveUI(brain.panel);setupPanelMinimize(brain.panel);function frame(time){brain.update(time/1000);requestAnimationFrame(frame);}requestAnimationFrame(frame);}
+import {setupPanelDrag} from './panel-drag.js';
+import './panel-drag.css';
+function mount(){if(!window.__CELL?.lifeMemory)return;const brain=createJsonBrain({context:'cell'});brain.setMemory(window.__CELL.lifeMemory);window.__CELL.jsonBrain=brain;setupResponsiveUI(brain.panel);setupPanelMinimize(brain.panel);setupPanelDrag(brain.panel);function frame(time){brain.update(time/1000);requestAnimationFrame(frame);}requestAnimationFrame(frame);}
 if(window.__CELL)mount();else addEventListener('cell:ready',mount,{once:true});
