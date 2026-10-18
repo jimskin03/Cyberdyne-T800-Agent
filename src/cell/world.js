@@ -4,46 +4,15 @@ import {Reflector} from 'three/addons/objects/Reflector.js';
 import {createBot} from '../bot.js';
 import {TOOLS,buildTool} from '../tools.js';
 import {S,ROOM,FEATURES,RECTS,CIRCLES} from './world/definition.js';
+import {POV_CAPTURE_WIDTH,POV_CAPTURE_HEIGHT,canonicalPov,createCaptureQueue} from './world/capture.js';
+import {supportAt} from './world/geometry.js';
 export {S,ROOM,FEATURES,RECTS,CIRCLES} from './world/definition.js';
+export {POV_CAPTURE_WIDTH,POV_CAPTURE_HEIGHT,canonicalPov,createCaptureQueue} from './world/capture.js';
+export {supportAt} from './world/geometry.js';
 
 // The cell. World units are metres; the T-800 rig is built in its own units and scaled by S (≈1.85 m tall).
 // Floor plan (looking down, north = -z):  window on the north wall, door on the east wall, bed along the west wall,
 // sink + steel mirror + chalk wall on the south wall, table + stool in the north-east, tool hatch in the ceiling.
-export const POV_CAPTURE_WIDTH=1280,POV_CAPTURE_HEIGHT=720;
-export function canonicalPov(camera){camera.aspect=POV_CAPTURE_WIDTH/POV_CAPTURE_HEIGHT;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);return camera;}
-// All callers waiting for the next frame receive that frame. A cancelled caller
-// is removed without cancelling another observer's request.
-export function createCaptureQueue(){
- const waiting=new Set();
- function request(options={}){
-  const signal=options?.signal||(typeof options?.aborted==='boolean'?options:null);
-  return new Promise((resolve,reject)=>{
-   const entry={resolve,reject,signal,abort:null};
-   const cancel=()=>{waiting.delete(entry);signal?.removeEventListener('abort',entry.abort);reject(signal?.reason??new DOMException('Capture cancelled.','AbortError'));};
-   entry.abort=cancel;
-   if(signal?.aborted){cancel();return;}
-   waiting.add(entry);signal?.addEventListener('abort',cancel,{once:true});
-  });
- }
- function flush(render){
-  if(!waiting.size)return false;
-  const batch=[...waiting];waiting.clear();
-  for(const entry of batch)entry.signal?.removeEventListener('abort',entry.abort);
-  try{const frame=render();for(const entry of batch)entry.resolve(frame);}
-  catch(error){for(const entry of batch)entry.reject(error);}
-  return true;
- }
- function cancelAll(reason=new DOMException('Capture queue destroyed.','AbortError')){
-  for(const entry of [...waiting]){waiting.delete(entry);entry.signal?.removeEventListener('abort',entry.abort);entry.reject(reason);}
- }
- return {request,flush,cancelAll,get pending(){return waiting.size;}};
-}
-export function supportAt(position,rects=[],circles=[]){
- const {x,y,z}=position;
- const surface=rects.find(r=>x>r.x0&&x<r.x1&&z>r.z0&&z<r.z1)||circles.find(c=>Math.hypot(x-c.x,z-c.z)<c.r);
- if(surface&&y>=surface.h-.05&&y<=surface.h+.3)return surface.id||'raised surface';
- return y>=-.05&&y<=.25?'floor':null;
-}
 const HATCH=new T.Vector3(.6,2.98,.3);
 
 
