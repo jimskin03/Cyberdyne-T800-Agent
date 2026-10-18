@@ -1140,7 +1140,10 @@ export function createActions(world, body, cb) {
   async function runResult(a, token) {
     const requested = a?.do || a?.action || a?.type || '';
     if (!isSupportedAction(requested))
-      return unavailable(`Unsupported action "${String(requested || '').slice(0, 80)}". No action was performed.`, {action: canonicalAction(requested)});
+      return unavailable(
+        `Unsupported action "${String(requested || '').slice(0, 80)}". No action was performed.`,
+        {action: canonicalAction(requested)},
+      );
     try {
       return normalizeActionResult(await dispatch(a, token));
     } catch (e) {
@@ -1148,12 +1151,18 @@ export function createActions(world, body, cb) {
         return cancelled('The action was cancelled before completion.');
       if (e instanceof NavigationError) {
         body.stop();
-        return blocked(`You could not reach ${String(a.target || a.object || a.on || 'that target')}: ${e.message}. You remain at (${body.st.x.toFixed(2)}, ${body.st.z.toFixed(2)}); the target was not reached.`);
+        return blocked(
+          `You could not reach ${String(a.target || a.object || a.on || 'that target')}: ${e.message}. You remain at (${body.st.x.toFixed(2)}, ${body.st.z.toFixed(2)}); the target was not reached.`,
+        );
       }
       return failed('That action failed: ' + String(e?.message || e).slice(0, 220));
     }
   }
-  async function run(a, token) { const result=await runResult(a, token); if(result.status==='cancelled')throw INTERRUPT; return result.text; }
+  async function run(a, token) {
+    const result = await runResult(a, token);
+    if (result.status === 'cancelled') throw INTERRUPT;
+    return result.text;
+  }
   async function dispatch(a, token) {
     tok = token;
     let doRaw = actionName(a.do || a.action || a.type || '');
@@ -1220,7 +1229,8 @@ export function createActions(world, body, cb) {
         if (obj && !r)
           return `You cannot aim the optical frame at "${obj}": that target is not known.`;
         const observed = await observeTarget(r, token);
-        if (!observed) return unavailable('Optical capture is unavailable; no new observation was acquired.');
+        if (!observed)
+          return unavailable('Optical capture is unavailable; no new observation was acquired.');
         return `Current optical frame${r ? ' facing ' + r.name : ''}: ${observed.text}`;
       }
       case 'turn':
@@ -1368,7 +1378,9 @@ export function createActions(world, body, cb) {
           await sleep(2);
           return '';
         }
-        return unavailable(`Unsupported action "${String(a.do || '').slice(0, 80)}". No action was performed.`);
+        return unavailable(
+          `Unsupported action "${String(a.do || '').slice(0, 80)}". No action was performed.`,
+        );
       }
     }
   }

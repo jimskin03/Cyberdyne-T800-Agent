@@ -73,4 +73,4 @@ See [RELEASE-REVIEW.md](RELEASE-REVIEW.md) for cleanup details and remaining rel
 
 ## Continuous integration
 
-The checked-in GitHub Actions workflow runs Node tests, mocked Chromium smoke coverage, brain validation, the production build, privacy checks, and the dependency audit. See [the refactor baseline](docs/refactor-baseline.md) for the flows and measurements that should stay stable during the staged refactor. The older [workflow example](docs/ci-workflow.example.yml) remains as a minimal reference.
+The checked-in GitHub Actions workflow runs Node tests, mocked Chromium smoke coverage, brain validation, the production build, privacy checks, and the dependency audit. See [the refactor baseline](docs/refactor-baseline.md) for the starting point and [the staged refactor results](docs/refactor-results.md) for the implemented boundaries, verification, and measured bundle deltas. The older [workflow example](docs/ci-workflow.example.yml) remains as a minimal reference.
