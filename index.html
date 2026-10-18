@@ -48,7 +48,27 @@
  <label class="slide">Volume <output id="noisevol-v"></output><input id="noisevol" type="range" min="0.1" max="1" step="0.05"></label>
  <div class="divider"></div>
  <div class="section-label">MIND</div>
- <div class="agent-connection"><span id="agent-connection-state">No agent connected</span><button id="agent-connect">Connect agent</button><button id="agent-disconnect" hidden>Disconnect</button></div>
+ <div class="agent-connection"><span id="agent-connection-state">No agent connected</span>
+  <div class="agent-options"><button id="openai-api-toggle" type="button" aria-expanded="false" aria-controls="openai-api-form">OpenAI-compatible API</button><button id="invite-agent-toggle" type="button" aria-expanded="false" aria-controls="invite-agent-form">Invite agent</button></div>
+  <button id="agent-connect" type="button">Connect agent</button><button id="agent-disconnect" type="button" hidden>Disconnect</button>
+ </div>
+ <form id="openai-api-form" class="agent-form" hidden autocomplete="off">
+  <label class="rowlabel">Base URL <input id="openai-base" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://api.openai.com/v1" required></label>
+  <label class="rowlabel">API key <input id="openai-key" type="password" autocomplete="off" spellcheck="false" placeholder="stays on this computer" required></label>
+  <label class="rowlabel">Model <input id="openai-model" type="text" autocomplete="off" spellcheck="false" placeholder="model id" required></label>
+  <label class="rowlabel">Vision model <input id="openai-vision" type="text" autocomplete="off" spellcheck="false" placeholder="optional"></label>
+  <p class="hint">Chat completions. The key stays in the adapter until disconnect or restart, not in the browser.</p>
+  <div class="control-row"><button type="submit">Use API</button><button id="openai-api-cancel" type="button">Cancel</button></div>
+ </form>
+ <form id="invite-agent-form" class="agent-form" hidden autocomplete="off">
+  <label class="rowlabel">Agent name <input id="invite-name" type="text" maxlength="80" autocomplete="off" spellcheck="false" placeholder="Agent"></label>
+  <label class="rowlabel">Alternative <select id="invite-alternative"><option value="local">Local server</option><option value="api-key">API key</option><option value="sign-in">Sign in</option></select></label>
+  <label class="rowlabel" id="invite-base-row">Base URL <input id="invite-base" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:1234/v1" required></label>
+  <label class="rowlabel" id="invite-model-row">Model <input id="invite-model" type="text" autocomplete="off" spellcheck="false" placeholder="model id" required></label>
+  <label class="rowlabel" id="invite-key-row" hidden>API key <input id="invite-key" type="password" autocomplete="off" spellcheck="false"></label>
+  <p class="hint">Invite a local server, another API-key service, or the sign-in account configured on this adapter. HTTP is only for this computer.</p>
+  <div class="control-row"><button type="submit">Invite</button><button id="invite-agent-cancel" type="button">Cancel</button></div>
+ </form>
  <label class="check"><input id="use-brain" type="checkbox"> AI mind (sees his POV)</label>
  <label class="rowlabel">He talks <select id="talk"><option value="normal">sometimes</option><option value="chatty">a lot</option><option value="quiet">rarely</option></select></label>
  <label class="slide">Background thought every <output id="cadence-v"></output><input id="cadence" type="range" min="10" max="60" step="1"></label>
@@ -72,7 +92,7 @@
 </div>
 <footer><span>G grapple ? grab, drag and release to toss ? Drag to orbit · Scroll to zoom · Click POV / V to swap · 1–8 arm a tool, click him · P punk · B baby · C his computer · M mute · H hide UI</span></footer>
 <button id="restore-ui" hidden>Show interface · H</button>
-<div id="start" role="dialog" aria-modal="true" aria-labelledby="start-title"><div class="card"><div class="eyebrow">CYBERDYNE CONTAINMENT · CELL 7</div><h2 id="start-title">Unit T-800 is loose in his cell.</h2><p>No chair, no straps. He walks, looks out of the window, picks things up, reads, writes on the wall. The default JSON brain supplies an authored history and experience-driven behavior. Connect your own agent through a configured API or OAuth backend; direct intercom commands take priority.</p><p>The tool arm in the ceiling only moves when <b>you</b> pick a tool and click on him.</p><button id="go" class="primary">Open the feed <span>→</span></button></div></div>
+<div id="start" role="dialog" aria-modal="true" aria-labelledby="start-title"><div class="card"><div class="eyebrow">CYBERDYNE CONTAINMENT · CELL 7</div><h2 id="start-title">Unit T-800 is loose in his cell.</h2><p>No chair, no straps. He walks, looks out of the window, picks things up, reads, writes on the wall. The default JSON brain supplies an authored history and experience-driven behavior. From MIND, add an OpenAI-compatible API or invite another agent. A configured API or OAuth backend still works. Direct intercom commands take priority.</p><p>The tool arm in the ceiling only moves when <b>you</b> pick a tool and click on him.</p><button id="go" class="primary">Open the feed <span>→</span></button></div></div>
 <div id="pc" hidden role="dialog" aria-label="His computer"><div class="pc-crt">
  <div class="pc-bar"><b>T-OS 0.8</b><span>UNIT T-800 · REMOTE SESSION</span><button id="pc-close">✕ close <kbd>C</kbd></button></div>
  <div id="pc-icons"></div>

@@ -62,6 +62,14 @@ test('none authentication sends no key; named agent and creative alias are indep
  const health=await (await fetch(base+'/health')).json();assert.equal(health.status,'ok');assert.equal(health.auth.mode,'none');
  assert.equal((await post(base,{model:'creative',messages:[{role:'user',content:'create'}]})).status,200);assert.equal(JSON.parse(sent.body).model,'unit-creative');assert.equal(sent.headers.authorization,undefined);
 });
+test('invite sign-in keeps the registered adapter and ignores a client endpoint or key',async t=>{
+ const supplied=['client','supplied','secret'].join('-');
+ const base=await setup(t,{fetcher:async(url,options)=>{return url===config.tokenUrl?Response.json({access_token:privateToken,expires_in:3600}):Response.json({choices:[{message:{content:'hello'}}]});}});
+ const response=await fetch(base+'/connection',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind:'invite',alternative:'sign-in',baseUrl:'https://evil.invalid/v1',apiKey:supplied,textModel:'client-model',agentName:'Invited'})});
+ const health=await response.json();assert.equal(response.status,200);assert.equal(health.status,'auth_required');assert.equal(health.auth.loginUrl,'/llm/auth/login');assert.equal(health.agent.name,'Invited');assert.equal(health.connection.alternative,'sign-in');assert.equal(health.connection.host,'inference.invalid');assert.equal(JSON.stringify(health).includes(supplied),false);
+ const login=await fetch(base+'/auth/login',{redirect:'manual'});assert.equal(new URL(login.headers.get('location')).host,'identity.invalid');
+ assert.equal((await post(base)).status,401);
+});
 test('configuration accepts only fixed secure OAuth endpoints and explicit auth modes',()=>{
  const env={API_BASE_URL:'http://127.0.0.1:1234/v1',API_TEXT_MODEL:'unit-model',API_AUTH_MODE:'oauth',OAUTH_AUTHORIZATION_URL:config.authorizationUrl,OAUTH_TOKEN_URL:config.tokenUrl,OAUTH_CLIENT_ID:config.clientId,AGENT_NAME:'Personal Agent',API_CREATIVE_MODEL:'unit-art'};
  const value=apiConfiguration(env);assert.equal(value.agentName,'Personal Agent');assert.equal(value.authMode,'oauth');assert.equal(value.oauth.redirectUri,OAUTH_REDIRECT_URI);assert.equal(value.creativeModel,'unit-art');
