@@ -27,7 +27,7 @@ import {createClimate} from './climate.js';
 import {createAutopilot} from './autopilot.js';
 import {createSpeechCadence} from './speech-cadence.js';
 import {operatorCommand} from './commands.js';
-import {resetSessionStorage, restoreSessionStorage, hasSessionBackup} from './session-storage.js';
+import {createCellSessionStore} from './storage/session-store.js';
 import {createComputer} from './computer.js';
 import {computerDocument} from './sandbox.js';
 import {createSlop, mountSlop} from './slop.js';
@@ -51,7 +51,6 @@ import {
 // only intervenes by picking a tool and clicking on him. Sensors and pulse update locally;
 // background model requests use wall-clock pacing, while direct questions take priority.
 const $ = (id) => document.getElementById(id);
-const SAVE = 'cell-public-cell.v1';
 let resettingSession = false;
 const PART = {
   head: 'skull',
@@ -121,6 +120,7 @@ const state = {
   offlineMinutes: 0,
 };
 const persistence = createPersistence('cell');
+const sessionStore = createCellSessionStore({storage: localStorage, persistence});
 const sessionMemory = createSessionMemory();
 const lifeMemory = createLifeMemory(lifeGraph);
 const nervous = createNervousSystem(),
@@ -136,7 +136,7 @@ const feeling = () => ({
   despair: state.despair,
 });
 try {
-  const s = JSON.parse(localStorage.getItem(SAVE) || '{}');
+  const s = sessionStore.readLocal() || {};
   for (const k of [
     'notes',
     'journal',
@@ -184,7 +184,7 @@ const where = () =>
 // Keep the saved archive intact; select a varied, relevant working memory below.
 const save = () => {
   if (resettingSession) return;
-  const ack = new Set(persistence.takeAcknowledged?.() || []);
+  const ack = new Set(sessionStore.takeAcknowledged());
   memoryOutbox = memoryOutbox.filter((e) => !ack.has(e.id));
   const data = {
     lifeMemory: lifeMemory.export(),
@@ -215,17 +215,11 @@ const save = () => {
     computer: computer?.export?.(),
     damage: world?.damageExport?.(),
   };
-  try {
-    localStorage.setItem(SAVE, JSON.stringify(data));
-  } catch {}
-  persistence.save({...data, archive: memoryOutbox.slice(0, 500)});
+  sessionStore.save(data);
 };
 
 const audio = createAudio({windowsVoice: true});
-let aiEnabled = false;
-try {
-  aiEnabled = localStorage.getItem('cell-public-ai.enabled') === 'true';
-} catch {}
+const aiEnabled = sessionStore.getAiEnabled();
 const thoughtClock = createThoughtClock();
 let nextOfflineMoveAt = 0;
 const mind = createMind({enabled: aiEnabled});
@@ -466,9 +460,7 @@ try {
     },
   });
   world.chalkImport(state.chalk);
-  try {
-    restorePosition(JSON.parse(localStorage.getItem(SAVE) || '{}').where);
-  } catch {}
+  restorePosition(sessionStore.readLocal()?.where);
 } catch (e) {
   $('fatal').hidden = false;
   $('fatal').textContent = 'The cell could not start: ' + (e.message || e);
@@ -1364,9 +1356,7 @@ $('heart-snd').onchange = (e) => {
   save();
 };
 $('use-brain').onchange = (e) => {
-  try {
-    localStorage.setItem('cell-public-ai.enabled', String(e.target.checked));
-  } catch {}
+  sessionStore.setAiEnabled(e.target.checked);
   mind.setEnabled(e.target.checked);
   if (!e.target.checked) {
     if (state.thinking) {
@@ -1621,16 +1611,16 @@ function stopForReset() {
 $('forget').textContent = 'Reset session memory';
 $('forget').onclick = () => {
   stopForReset();
-  resetSessionStorage(localStorage);
+  sessionStore.reset();
   location.reload();
 };
 const undoReset = document.createElement('button');
 undoReset.textContent = 'Restore previous session';
-undoReset.hidden = !hasSessionBackup(localStorage);
+undoReset.hidden = !sessionStore.hasBackup();
 $('forget').after(undoReset);
 undoReset.onclick = () => {
   stopForReset();
-  if (restoreSessionStorage(localStorage)) location.reload();
+  if (sessionStore.restoreBackup()) location.reload();
 };
 function intercom(q) {
   q = (q || '').trim().slice(0, 300);
@@ -1866,7 +1856,7 @@ mind.refresh().then(() => paintAgentConnection());
 function hud() {
   paintAgentConnection();
 
-  nerveHud.update(persistence.status);
+  nerveHud.update(sessionStore.status);
   const dig = Math.max(0, 100 - state.despair * 0.6 - state.pain * 0.3);
   for (const [k, v] of [
     ['pain', state.pain],
@@ -2152,22 +2142,13 @@ addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !$('pc').hidden) pcToggle(false);
 });
 world.crt.set('desktop', {list: computer.files()});
-const restored = persistence.loading.then(async (snapshot) => {
-  let data = snapshot?.data;
-  try {
-    data ??= JSON.parse(localStorage.getItem(SAVE) || 'null');
-  } catch {}
+const restored = sessionStore.loading.then(async ({snapshot, data, local}) => {
   if (!data) return;
   sessionMemory.restore(data.sessionMemory, data);
   lifeMemory.restore(data.lifeMemory);
   nervous.restore(data.nervous, data);
   cognitive.restore(data.cognitive);
-  try {
-    const local = JSON.parse(localStorage.getItem(SAVE) || '{}');
-    memoryOutbox = local.archive || data.archive || [];
-  } catch {
-    memoryOutbox = data.archive || [];
-  }
+  memoryOutbox = local?.archive || data.archive || [];
   for (const k of [
     'notes',
     'journal',
