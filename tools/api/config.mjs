@@ -27,7 +27,7 @@ export function apiConfiguration(env=process.env){
  if(base.search)throw Error('API_BASE_URL must not contain queries.');
  return {configured:true,endpoint:base.href.replace(/\/$/,'')+'/chat/completions',key:env.API_KEY||'',textModel:env.API_TEXT_MODEL,visionModel:env.API_VISION_MODEL||'',creativeModel:env.API_CREATIVE_MODEL||'',agentName:agentLabel(env.AGENT_NAME),authMode,oauth:authMode==='oauth'?oauthConfiguration(env):null,source:'env',kind:'configured',alternative:authMode==='oauth'?'sign-in':authMode==='none'?'local':'api-key',host:base.hostname,allowedOrigins};
 }
-function cleanModel(value,message){
+export function cleanModel(value,message){
  if(typeof value!=='string')reject(400,message);
  const model=value.trim();
  if(!/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,159}$/.test(model))reject(400,message);
@@ -52,21 +52,29 @@ function requestedName(value,fallback){
  if(typeof value!=='string')reject(400,'Agent name must be text.');
  return agentLabel(value);
 }
-export function operatorConnection(body,{oauthAvailable=false,fallback=null,localPort=0}={}){
+export function operatorConnection(body,{oauthAvailable=false,fallback=null,current=null,localPort=0,discovery=false}={}){
  if(!body||typeof body!=='object'||Array.isArray(body))reject(400,'Expected a JSON object.');
  if(body.kind==='openai-compatible'){
-  const target=chatEndpoint(body.baseUrl,localPort),key=cleanSecret(body.apiKey);
-  if(!key)reject(400,'An API key is required for an OpenAI-compatible API.');
-  return {configured:true,source:'session',kind:'openai-compatible',alternative:'api-key',authMode:'api-key',endpoint:target.endpoint,host:target.host,key,textModel:cleanModel(body.textModel,'Set a model id.'),visionModel:body.visionModel==null||body.visionModel===''?'':cleanModel(body.visionModel,'Vision model id is invalid.'),creativeModel:'',agentName:requestedName(body.agentName,fallback?.agentName),usesOAuth:false};
+  const target=chatEndpoint(body.baseUrl,localPort),key=connectionKey(body,target,current);
+  return {configured:true,source:'session',kind:'openai-compatible',alternative:key?'api-key':'local',authMode:key?'api-key':'none',endpoint:target.endpoint,host:target.host,key,textModel:discovery?'':cleanModel(body.textModel,'Set a model id.'),visionModel:body.visionModel==null||body.visionModel===''?'':cleanModel(body.visionModel,'Vision model id is invalid.'),creativeModel:'',agentName:requestedName(body.agentName,current?.agentName||fallback?.agentName),usesOAuth:false};
  }
  if(body.kind!=='invite')reject(400,'Unknown connection option.');
  if(!['local','api-key','sign-in'].includes(body.alternative))reject(400,'Choose a local server, an API key, or sign-in.');
  if(body.alternative==='sign-in'){
+  if(discovery)reject(400,'Model discovery is available for API-key and local connections.');
   if(!oauthAvailable||!fallback?.endpoint)reject(409,'Sign-in is not configured on this adapter.');
   return {usesOAuth:true,source:'session',kind:'invite',alternative:'sign-in',authMode:'oauth',agentName:requestedName(body.agentName,fallback.agentName)};
  }
- const target=chatEndpoint(body.baseUrl,localPort),key=cleanSecret(body.apiKey);
+ const target=chatEndpoint(body.baseUrl,localPort),key=connectionKey(body,target,current);
  if(body.alternative==='local'&&key)reject(400,'A local server invite does not take an API key.');
  if(body.alternative==='api-key'&&!key)reject(400,'An API key is required for this alternative.');
- return {configured:true,source:'session',kind:'invite',alternative:body.alternative,authMode:body.alternative==='local'?'none':'api-key',endpoint:target.endpoint,host:target.host,key:body.alternative==='local'?'':key,textModel:cleanModel(body.textModel,'Set a model id.'),visionModel:body.visionModel==null||body.visionModel===''?'':cleanModel(body.visionModel,'Vision model id is invalid.'),creativeModel:'',agentName:requestedName(body.agentName,fallback?.agentName),usesOAuth:false};
+ return {configured:true,source:'session',kind:'invite',alternative:body.alternative,authMode:body.alternative==='local'?'none':'api-key',endpoint:target.endpoint,host:target.host,key:body.alternative==='local'?'':key,textModel:discovery?'':cleanModel(body.textModel,'Set a model id.'),visionModel:body.visionModel==null||body.visionModel===''?'':cleanModel(body.visionModel,'Vision model id is invalid.'),creativeModel:'',agentName:requestedName(body.agentName,current?.agentName||fallback?.agentName),usesOAuth:false};
+}
+
+function connectionKey(body,target,current){
+ const key=cleanSecret(body.apiKey);
+ if(key||body.reuseKey!==true)return key;
+ if(!current?.key||current.authMode==='oauth'||current.endpoint!==target.endpoint)
+  reject(400,'Saved key does not match this endpoint. Enter a key or turn off Use saved key.');
+ return current.key;
 }

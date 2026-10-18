@@ -7,6 +7,7 @@ import {agentLabel,apiConfiguration,operatorConnection} from './api/config.mjs';
 import {createConnectionState} from './api/connection-state.mjs';
 import {validateChatRequest} from './api/request-validation.mjs';
 import {requestUpstream} from './api/upstream.mjs';
+import {requestModels} from './api/models.mjs';
 
 export {agentLabel,apiConfiguration,operatorConnection} from './api/config.mjs';
 
@@ -30,6 +31,19 @@ export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcur
   }
   if(!guardLocalRequest(req,res,{allowedOrigins:config.allowedOrigins||[]}))return;
   if(req.method==='GET'&&req.url==='/health')return send(200,connections.health(connections.current()));
+  if(req.method==='GET'&&pathname==='/connection')return send(200,{settings:connections.settings(connections.current())});
+  if(req.method==='POST'&&pathname==='/connection/models'){
+   if(active>=maxConcurrent)return send(429,{error:'Adapter is busy. Retry later.'});
+   active++;
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.min(timeoutMs,15000));
+   const cancel=()=>{if(!res.writableEnded)controller.abort();};res.on('close',cancel);
+   try{
+    const body=await readJson(req,{limit:16*1024});
+    const live=operatorConnection(body,{current:connections.current(),localPort:req.socket.localPort,discovery:true});
+    return send(200,await requestModels({live,fetcher,signal:controller.signal}));
+   }catch(error){return send(error.status||(controller.signal.aborted?504:502),{error:error.status?error.message:controller.signal.aborted?'Model fetch timed out.':'Model fetch failed. Check the endpoint and try again.'});}
+   finally{clearTimeout(timer);res.off('close',cancel);active--;}
+  }
   if(oauth&&connections.current().authMode==='oauth'&&req.method==='GET'&&req.url==='/auth/login'){
    res.writeHead(302,{location:oauth.begin(),'cache-control':'no-store','referrer-policy':'no-referrer'});res.end();return;
   }
@@ -38,7 +52,7 @@ export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcur
    try{
     const body=await readJson(req,{limit:16*1024});
     if(body?.kind==='clear')connections.clear();
-    else connections.set(operatorConnection(body,{oauthAvailable:!!(oauth&&config.endpoint&&config.configured!==false),fallback:config,localPort:req.socket.localPort}));
+    else connections.set(operatorConnection(body,{oauthAvailable:!!(oauth&&config.endpoint&&config.configured!==false),fallback:config,current:connections.current(),localPort:req.socket.localPort}));
     return send(200,connections.health(connections.current()));
    }catch(error){return send(error.status||400,{error:error.status?String(error.message).slice(0,180):'Connection was rejected.'});}
   }

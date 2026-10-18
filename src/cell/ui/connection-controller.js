@@ -19,6 +19,86 @@ export function createConnectionController({
 } = {}) {
   const $ = (id) => document.getElementById(id);
   let displayedAgentName = '';
+  let formRevision = 0;
+  let modelsController = null;
+
+  function cancelDiscovery() {
+    modelsController?.abort();
+    modelsController = null;
+    for (const prefix of ['openai', 'invite']) {
+      $(prefix + '-fetch-models').disabled = false;
+      $(prefix + '-model-status').textContent = '';
+      $(prefix + '-model-options-row').hidden = true;
+    }
+  }
+
+  function connectionBody(prefix) {
+    const body = {
+      kind: prefix === 'openai' ? 'openai-compatible' : 'invite',
+      agentName: $(prefix + '-name').value.trim(),
+      baseUrl: $(prefix + '-base').value.trim(),
+      apiKey: $(prefix + '-key').value,
+      reuseKey: !!$(prefix + '-reuse-key').checked,
+      textModel: $(prefix + '-model').value.trim(),
+    };
+    if (prefix === 'openai') body.visionModel = $('openai-vision').value.trim();
+    else {
+      body.alternative = $('invite-alternative').value;
+      if (body.alternative !== 'api-key') {
+        delete body.apiKey;
+        delete body.reuseKey;
+      }
+    }
+    return body;
+  }
+
+  async function fetchModels(prefix) {
+    cancelDiscovery();
+    showConnectionError();
+    const controller = new AbortController();
+    modelsController = controller;
+    const button = $(prefix + '-fetch-models');
+    const status = $(prefix + '-model-status');
+    button.disabled = true;
+    status.textContent = 'Fetching models…';
+    try {
+      const response = await fetcher('/llm/connection/models', {
+        method: 'POST',
+        headers: {'content-type': 'application/json'},
+        body: JSON.stringify(connectionBody(prefix)),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (controller.signal.aborted) return;
+      if (!response.ok) throw Error(connectionFailureMessage(response.status, data));
+      if (!Array.isArray(data.models))
+        throw Error('Invalid model list. Enter a model ID manually.');
+      const select = $(prefix + '-model-options');
+      select.replaceChildren();
+      for (const id of ['', ...data.models]) {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = id || 'Choose a model';
+        select.appendChild(option);
+      }
+      $(prefix + '-model-options-row').hidden = !data.models.length;
+      status.textContent = data.models.length
+        ? `${data.models.length} models found. Choose a chat model or enter its ID below.`
+        : 'No models returned. You can still enter a model ID manually.';
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        status.textContent = '';
+        showConnectionError(
+          error.name === 'TimeoutError' ? 'Model fetch timed out. Try again.' : error.message,
+        );
+      }
+    } finally {
+      if (modelsController === controller) {
+        modelsController = null;
+        button.disabled = false;
+      }
+    }
+  }
   function showConnectionError(message = '') {
     const error = $('agent-connection-error');
     if (error) {
@@ -130,6 +210,8 @@ export function createConnectionController({
   }
 
   function hideForms() {
+    formRevision++;
+    cancelDiscovery();
     showConnectionError();
     for (const [form, button] of [
       ['openai-api-form', 'openai-api-toggle'],
@@ -143,9 +225,14 @@ export function createConnectionController({
   function clearSecrets() {
     $('openai-key').value = '';
     $('invite-key').value = '';
+    for (const prefix of ['openai', 'invite']) {
+      $(prefix + '-reuse-key').checked = false;
+      $(prefix + '-reuse-row').hidden = true;
+    }
+    syncInviteFields();
   }
 
-  function toggleForm(name) {
+  async function toggleForm(name) {
     const open =
       name === 'openai'
         ? $('openai-api-form').hidden
@@ -160,6 +247,29 @@ export function createConnectionController({
     $(form).hidden = false;
     $(button).setAttribute('aria-expanded', 'true');
     $(name === 'openai' ? 'openai-base' : 'invite-name').focus();
+    const revision = formRevision;
+    try {
+      const response = await fetcher('/llm/connection', {signal: AbortSignal.timeout(3000)});
+      const data = await response.json();
+      if (!response.ok || revision !== formRevision || !data.settings?.baseUrl) return;
+      const settings = data.settings;
+      if (name === 'openai' && settings.alternative === 'sign-in') return;
+      for (const [field, value] of [
+        ['base', settings.baseUrl],
+        ['model', settings.textModel],
+        ['name', settings.agentName],
+      ])
+        $(name + '-' + field).value = value || '';
+      $(name + '-reuse-row').hidden = !settings.hasKey;
+      $(name + '-reuse-key').checked = !!settings.hasKey;
+      if (name === 'openai') $('openai-vision').value = settings.visionModel || '';
+      else {
+        $('invite-alternative').value = settings.alternative;
+        syncInviteFields();
+      }
+    } catch {
+      // Keep manual entry usable while the adapter is starting or unavailable.
+    }
   }
 
   function syncInviteFields() {
@@ -171,7 +281,9 @@ export function createConnectionController({
     $('invite-key-row').hidden = !keyed;
     $('invite-base').required = !signIn;
     $('invite-model').required = !signIn;
-    $('invite-key').required = keyed;
+    $('invite-key').required = keyed && !$('invite-reuse-key').checked;
+    $('invite-fetch-models').hidden = signIn;
+    if (!keyed) $('invite-reuse-row').hidden = true;
     $('invite-base').placeholder = keyed
       ? 'https://service.example/v1'
       : 'http://127.0.0.1:1234/v1';
@@ -253,21 +365,44 @@ export function createConnectionController({
     hideForms();
     clearSecrets();
   };
-  $('invite-alternative').onchange = syncInviteFields;
+  $('invite-alternative').onchange = () => {
+    formRevision++;
+    cancelDiscovery();
+    $('invite-key').value = '';
+    $('invite-reuse-key').checked = false;
+    syncInviteFields();
+  };
+  for (const prefix of ['openai', 'invite']) {
+    $(prefix + '-fetch-models').onclick = () => fetchModels(prefix);
+    $(prefix + '-model-options').onchange = () => {
+      if ($(prefix + '-model-options').value)
+        $(prefix + '-model').value = $(prefix + '-model-options').value;
+    };
+    $(prefix === 'openai' ? 'openai-api-form' : 'invite-agent-form').oninput = () => {
+      formRevision++;
+    };
+    $(prefix + '-base').oninput = () => {
+      cancelDiscovery();
+      $(prefix + '-reuse-key').checked = false;
+      $(prefix + '-reuse-row').hidden = true;
+      if (prefix === 'invite') syncInviteFields();
+    };
+    $(prefix + '-key').oninput = cancelDiscovery;
+    $(prefix + '-reuse-key').onchange = () => {
+      cancelDiscovery();
+      if (prefix === 'invite') syncInviteFields();
+    };
+  }
   syncInviteFields();
 
   $('openai-api-form').onsubmit = async (event) => {
     event.preventDefault();
-    const apiKey = $('openai-key').value;
+    const body = connectionBody('openai');
+    formRevision++;
+    cancelDiscovery();
     $('openai-key').value = '';
     try {
-      await postConnection({
-        kind: 'openai-compatible',
-        baseUrl: $('openai-base').value.trim(),
-        apiKey,
-        textModel: $('openai-model').value.trim(),
-        visionModel: $('openai-vision').value.trim(),
-      });
+      await postConnection(body);
       hideForms();
       await mind.refresh();
       enableMind();
@@ -280,15 +415,11 @@ export function createConnectionController({
 
   $('invite-agent-form').onsubmit = async (event) => {
     event.preventDefault();
-    const alternative = $('invite-alternative').value;
-    const apiKey = $('invite-key').value;
+    const body = connectionBody('invite');
+    const alternative = body.alternative;
+    formRevision++;
+    cancelDiscovery();
     $('invite-key').value = '';
-    const body = {kind: 'invite', alternative, agentName: $('invite-name').value.trim()};
-    if (alternative !== 'sign-in') {
-      body.baseUrl = $('invite-base').value.trim();
-      body.textModel = $('invite-model').value.trim();
-    }
-    if (alternative === 'api-key') body.apiKey = apiKey;
     try {
       await postConnection(body);
       hideForms();

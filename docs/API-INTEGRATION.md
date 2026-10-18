@@ -4,7 +4,9 @@ The scene has no required AI service or model. Give your agent a name and connec
 
 ## Configure the backend
 
-Copy `.env.example` to ignored local `.env`, then set the fields for your chosen service:
+For interactive setup, run `npm run api` and `npm run dev`, then use the MIND panel below. No `.env` file is required.
+
+For optional startup defaults or OAuth registration, create an ignored local `.env` with the fields for your chosen service:
 
 ```dotenv
 AGENT_NAME=My Agent
@@ -32,8 +34,12 @@ A blank API configuration — no base URL, model, key, or OAuth registration —
 
 With the adapter running, the **MIND** section offers two ways to connect without editing `.env`. On a phone, open **Controls** first.
 
-- **OpenAI-compatible API** takes a base URL, API key, text model, and optional vision model. The adapter appends `/chat/completions` (a pasted completions URL is accepted once) and keeps the key in process memory. The browser does not store the key, and health checks never return it.
+- **OpenAI-compatible API** takes an agent name, base URL, optional API key, text model, and optional vision model. Leave the key blank for an unauthenticated server. The adapter appends `/chat/completions` (a pasted completions URL is accepted once) and keeps the key in process memory. The browser does not store the key, and health checks never return it.
 - **Invite agent** is for other alternatives: a local or HTTPS server with no key, a different API-key service, or the OAuth account already registered in `.env`. Sign-in does not accept a client-supplied token URL, client secret, or API key. Complete the popup when it opens.
+
+Use **Fetch models** in either API form to check model-list access with the entered endpoint and credentials before connecting. It calls the provider's `GET /models` endpoint and offers the returned IDs in a selector; you can still enter an ID manually. This follows the [OpenAI-compatible list-models format](https://developers.openai.com/api/reference/resources/models/methods/list) (`data[].id`). Discovery does not enable AI, change the active connection, send a chat prompt, or prove that a listed model supports chat or vision. Some providers do not expose model discovery; manual entry remains available. A newly entered key remains in the password field during discovery and is cleared on save, cancel, or switching forms; it is never written to browser storage.
+
+Reopen a form to load the running adapter's current settings. **Use saved key** reuses the backend key when editing models on the same endpoint; keys are never returned to the browser. Enter a new key when switching endpoints. Uncheck **Use saved key** to connect without authentication. Saving updates the running adapter immediately for subsequent requests and overrides any startup defaults until disconnect or restart. Settings and keys entered in the scene are kept in process memory, so restart clears them.
 
 **Disconnect** turns AI off and drops a connection made from the scene. A startup `.env` configuration remains. OAuth tokens are cleared when that session was using sign-in. Restarting the adapter also clears scene connections and OAuth tokens.
 
@@ -43,15 +49,11 @@ Chat requests still cannot choose an upstream URL, model ID, or authorization he
 
 Run `npm run api` on the same machine as `npm run dev`. The browser uses that machine's same-origin `/llm` development proxy; keep the API adapter bound to `127.0.0.1:18081`.
 
-The adapter accepts scene origins `http://127.0.0.1:5340` and `http://localhost:5340` by default. To use a Tailscale IP or hostname, put the exact browser origin in your ignored local `.env`:
+The included dev and preview proxies validate requests against the scene's current Host before forwarding to the loopback adapter. Tailscale/LAN addresses, hostnames, and alternate scene ports work without editing `.env` or restarting the adapter. Cross-site browser requests remain rejected. Anyone with access to this scene server can change its shared API connection; use your private network or hosting access controls when exposing it remotely.
 
-```dotenv
-API_ALLOWED_ORIGINS=http://your-machine.your-tailnet.ts.net:5340
-```
+For a custom proxy that forwards the original browser Origin directly to the adapter, `API_ALLOWED_ORIGINS` remains an optional server setting containing exact HTTP/HTTPS origins separated by commas. Only that custom setup needs a restart after changing its allowlist. Never accept arbitrary forwarded Host/Origin headers as authorization.
 
-Replace the example with your own scheme, hostname or IP, and port. Multiple origins may be separated by commas. Do not include a page path, wildcard, credentials, query, or fragment. Restart `npm run api` after changing this setting. The allowlist stays on the server and cannot be changed through the connection form. Only allow scene origins you control: users of an allowed scene can configure and use the adapter.
-
-If the connection form reports **Scene origin is not allowed**, check this setting. **Agent adapter is unavailable** means to start or restart `npm run api` alongside the dev server. A static site without a same-origin `/llm` backend cannot connect by entering a provider URL alone. Connection errors remain visible near the form, and the key field is cleared after submission; enter it again when retrying.
+**Agent adapter is unavailable** means to start or restart `npm run api` alongside the scene server. A static site without a same-origin `/llm` backend cannot connect by entering a provider URL alone. Connection errors remain visible near the form, and the key field is cleared after saving; enter it again when retrying a failed save.
 
 ## OAuth sign-in
 
@@ -84,7 +86,7 @@ The browser sends service-neutral routing labels; real model IDs stay in backend
 | `vision` | Optical interpretation | `API_VISION_MODEL`; text fallback for text-only requests |
 | `creative` | Drawing, computer apps and procedural objects | `API_CREATIVE_MODEL`, then vision/text fallback |
 
-The Vite development server strips `/llm` before forwarding to the local backend. Browser `/llm/health` reaches backend `/health`. For example, a configured but unsigned-in OAuth backend reports:
+The Vite development and preview servers strip `/llm` before forwarding to the local backend. Browser `/llm/health` reaches backend `/health`. For example, a configured but unsigned-in OAuth backend reports:
 
 ```json
 {
@@ -96,6 +98,8 @@ The Vite development server strips `/llm` before forwarding to the local backend
   "upstreamChecked": false
 }
 ```
+
+`GET /llm/connection` returns editable non-secret `settings` (base URL, model IDs, agent name, authentication alternative, and `hasKey`). `POST /llm/connection/models` accepts the same draft endpoint/key fields as saving, without requiring a text model, and returns `{ "models": ["model-id"] }`. It accepts `reuseKey: true` only for the active endpoint. Discovery is bounded to 15 seconds, a 2 MiB provider response, and at most 2,000 unique valid model IDs; it shares the adapter's concurrency limit and cancels when the browser disconnects. Upstream redirects and raw error bodies are not forwarded.
 
 Once locally configured authentication is available, `status` is `"ok"` and `auth.connected` is true. Modes are `api-key`, `oauth` or `none`. `connection.source` is `env`, `session`, or `none`. `connection.kind` is `configured`, `openai-compatible`, `invite`, or `none`. Health does not make a paid upstream request or prove that credentials, model permissions, scopes and quota work. Advertise vision only when configured for image input. Never return credentials, tokens, or API keys in health. The host is the endpoint hostname only.
 

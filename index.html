@@ -55,10 +55,15 @@
  <p id="agent-connection-error" class="hint" role="alert" hidden></p>
  <form id="openai-api-form" class="agent-form" hidden autocomplete="off">
   <label class="rowlabel">Base URL <input id="openai-base" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://api.openai.com/v1" required></label>
-  <label class="rowlabel">API key <input id="openai-key" type="password" autocomplete="off" spellcheck="false" placeholder="stays on this computer" required></label>
+  <label class="rowlabel">Agent name <input id="openai-name" type="text" maxlength="80" placeholder="Agent"></label>
+  <label class="rowlabel">API key <input id="openai-key" type="password" autocomplete="off" spellcheck="false" placeholder="optional for servers without authentication"></label>
+  <label class="check" id="openai-reuse-row" hidden><input id="openai-reuse-key" type="checkbox"> Use saved key</label>
+  <button id="openai-fetch-models" type="button">Fetch models</button>
+  <p id="openai-model-status" class="hint" role="status"></p>
+  <label class="rowlabel" id="openai-model-options-row" hidden>Available models <select id="openai-model-options"></select></label>
   <label class="rowlabel">Model <input id="openai-model" type="text" autocomplete="off" spellcheck="false" placeholder="model id" required></label>
   <label class="rowlabel">Vision model <input id="openai-vision" type="text" autocomplete="off" spellcheck="false" placeholder="optional"></label>
-  <p class="hint">Start the backend with <code>npm run api</code> before connecting. Chat completions. The key stays in the adapter until disconnect or restart, not in the browser.</p>
+  <p class="hint">Run <code>npm run api</code>, then change settings here at any time. Saved keys stay on the backend until disconnect or restart. Model discovery checks access; choose a chat-capable model.</p>
   <div class="control-row"><button type="submit">Use API</button><button id="openai-api-cancel" type="button">Cancel</button></div>
  </form>
  <form id="invite-agent-form" class="agent-form" hidden autocomplete="off">
@@ -67,6 +72,10 @@
   <label class="rowlabel" id="invite-base-row">Base URL <input id="invite-base" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:1234/v1" required></label>
   <label class="rowlabel" id="invite-model-row">Model <input id="invite-model" type="text" autocomplete="off" spellcheck="false" placeholder="model id" required></label>
   <label class="rowlabel" id="invite-key-row" hidden>API key <input id="invite-key" type="password" autocomplete="off" spellcheck="false"></label>
+  <label class="check" id="invite-reuse-row" hidden><input id="invite-reuse-key" type="checkbox"> Use saved key</label>
+  <button id="invite-fetch-models" type="button">Fetch models</button>
+  <p id="invite-model-status" class="hint" role="status"></p>
+  <label class="rowlabel" id="invite-model-options-row" hidden>Available models <select id="invite-model-options"></select></label>
   <p class="hint">Invite a local server, another API-key service, or the sign-in account configured on this adapter. HTTP is only for this computer.</p>
   <div class="control-row"><button type="submit">Invite</button><button id="invite-agent-cancel" type="button">Cancel</button></div>
  </form>
