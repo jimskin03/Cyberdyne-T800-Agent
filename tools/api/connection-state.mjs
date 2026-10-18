@@ -19,5 +19,6 @@ export function createConnectionState(config,oauth){
   return {source:live.source==='session'?'session':'env',kind:['openai-compatible','invite','configured'].includes(live.kind)?live.kind:'configured',alternative,host:typeof live.host==='string'?live.host:''};
  };
  const health=live=>({status:live.configured===false||!live.endpoint?'unconfigured':connected(live)?'ok':'auth_required',vision:!!live.visionModel,agent:{name:live.agentName||'Agent'},auth:auth(live),connection:publicConnection(live),brain:'configured-api-adapter',upstreamChecked:false});
- return {current,connected,modeOf,health,set(value){session=value;},clear(){session=null;}};
+ const settings=live=>({baseUrl:(live.endpoint||'').replace(/\/chat\/completions$/,''),textModel:live.textModel||'',visionModel:live.visionModel||'',agentName:live.agentName||'Agent',alternative:modeOf(live)==='oauth'?'sign-in':modeOf(live)==='none'?'local':'api-key',hasKey:modeOf(live)==='api-key'&&!!live.key});
+ return {current,connected,modeOf,health,settings,set(value){session=value;},clear(){session=null;}};
 }

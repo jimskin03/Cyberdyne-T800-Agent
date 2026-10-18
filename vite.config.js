@@ -1,6 +1,9 @@
 import {defineConfig} from 'vite';
+import {sceneProxy,llmProxy} from './tools/scene-proxy.mjs';
 
 export default defineConfig({
+ plugins:[sceneProxy()],
+ preview:{proxy:llmProxy()},
  build:{chunkSizeWarningLimit:1400,rollupOptions:{output:{manualChunks:{'default-brain':['./src/cell/default-brain.json']}}}},
  server:{
   // 1. Allow all incoming host connections (local network and public IPs)
@@ -13,5 +16,5 @@ export default defineConfig({
   // 4. (Optional) Allow all incoming HTTP Host headers to bypass host checking
   allowedHosts: true, 
   watch:{ignored:['**/test/**','**/docs/**','**/tools/**','**/logs/**','**/saved-world/**'],usePolling:process.platform==='win32',interval:300},
-  proxy:{'/llm':{target:'http://127.0.0.1:18081',changeOrigin:true,rewrite:p=>p.replace(/^\/llm/,'')}}}
+  proxy:llmProxy()}
 });

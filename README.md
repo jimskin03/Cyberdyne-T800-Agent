@@ -83,16 +83,17 @@ npm run brain:validate -- examples/brain.starter.json "repair radio"
 
 ## Connecting an AI mind (optional)
 
-1. Copy `.env.example` to `.env` (ignored by Git) and set `AGENT_NAME`, `API_BASE_URL`, the model IDs, and either `API_KEY` or the OAuth settings. Base URLs must be HTTPS, or HTTP on loopback.
-2. Run `npm run api` in a second terminal. The adapter listens on loopback port 18081 only, and keys and OAuth tokens stay in that backend process.
-3. Run `npm run dev`. The dev server forwards `/llm` requests to the adapter.
-4. Turn on **AI mind** in Controls and complete sign-in if asked. Alternatively, leave the API fields in `.env` blank and use **OpenAI-compatible API** or **Invite agent** in the MIND controls once the adapter is running.
+1. Run `npm run api` in a second terminal. It starts without a `.env` file and keeps API keys in backend memory.
+2. Run `npm run dev`, open the scene, and select **OpenAI-compatible API** in the MIND controls (inside **Controls** on phones).
+3. Enter the base URL and API key, or leave the key blank for an unauthenticated local server. Select **Fetch models**, choose a chat-capable model, then **Use API**. You can also type a model ID directly.
+4. Reopen the same settings to change the endpoint, name, key, text model, or vision model while the server is running. **Use saved key** lets you change models without entering the key again. Changes take effect for new requests.
 
+**Invite agent** also supports model discovery for local and API-key connections. OAuth registration and optional startup defaults can still be configured in a local `.env`; see the integration guide. Scene settings last until adapter restart.
 A static deployment (`dist/` on any web server) has no `/llm` backend, so the scene runs offline and AI shows as unavailable unless you add your own backend and proxy. No service or model is chosen for you; requests use your account and may incur charges. Automated tests use mocks only. See [the API integration guide](docs/API-INTEGRATION.md) for request and response formats and OAuth details.
 
 If the character does not answer, check the status below the chat input: **AI off** means AI mind is not selected, and **AI unavailable** means the backend is not reachable. Background thinking defaults to once every 30 wall-clock seconds, and direct questions take priority.
 
-When opening the scene over Tailscale or a private network, run the API backend on the dev-server machine and set `API_ALLOWED_ORIGINS` in its ignored local `.env` to the exact scene origin you open. Restart `npm run api` after changing it. See [private network setup and connection errors](docs/API-INTEGRATION.md#using-the-scene-over-tailscale-or-another-private-network).
+When opening the scene over Tailscale or a private network, run the API backend on the scene-server machine. The included dev and preview proxies accept settings from the scene's current address and port without an `.env` origin setting. See [private network setup and connection errors](docs/API-INTEGRATION.md#using-the-scene-over-tailscale-or-another-private-network).
 
 ## Continuous integration
 
