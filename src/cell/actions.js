@@ -1,4 +1,6 @@
 import * as T from 'three';
+import {canonicalAction, isSupportedAction, actionName} from './actions/catalog.js';
+import {normalizeActionResult, blocked, unavailable, cancelled, failed} from './actions/result.js';
 
 // The action vocabulary the mind can use, and the senses it gets back.
 // Every action is an async routine that moves the body over real time and returns what he noticed ("result").
@@ -1135,100 +1137,37 @@ export function createActions(world, body, cb) {
       : {text: 'Fresh optical observation unavailable.'};
   }
   // ---------- the dispatcher ----------
-  async function run(a, token) {
+  async function runResult(a, token) {
+    const requested = a?.do || a?.action || a?.type || '';
+    if (!isSupportedAction(requested))
+      return unavailable(`Unsupported action "${String(requested || '').slice(0, 80)}". No action was performed.`, {action: canonicalAction(requested)});
     try {
-      return await dispatch(a, token);
+      return normalizeActionResult(await dispatch(a, token));
     } catch (e) {
-      if (!(e instanceof NavigationError)) throw e;
-      body.stop();
-      return `You could not reach ${String(a.target || a.object || a.on || 'that target')}: ${e.message}. You remain at (${body.st.x.toFixed(2)}, ${body.st.z.toFixed(2)}); the target was not reached.`;
+      if (e === INTERRUPT || token?.cancelled || token?.signal?.aborted || e?.name === 'AbortError')
+        return cancelled('The action was cancelled before completion.');
+      if (e instanceof NavigationError) {
+        body.stop();
+        return blocked(`You could not reach ${String(a.target || a.object || a.on || 'that target')}: ${e.message}. You remain at (${body.st.x.toFixed(2)}, ${body.st.z.toFixed(2)}); the target was not reached.`);
+      }
+      return failed('That action failed: ' + String(e?.message || e).slice(0, 220));
     }
   }
+  async function run(a, token) { const result=await runResult(a, token); if(result.status==='cancelled')throw INTERRUPT; return result.text; }
   async function dispatch(a, token) {
     tok = token;
-    let doRaw = norm(a.do || a.action || a.type || '');
+    let doRaw = actionName(a.do || a.action || a.type || '');
     let obj = a.object ?? a.target ?? a.item ?? a.on ?? a.at;
     const how = String(a.how || a.mode || a.manner || doRaw).toLowerCase();
-    const map = {
-      go_to: 'walk_to',
-      move_to: 'walk_to',
-      walk: 'walk_to',
-      go: 'walk_to',
-      approach: 'walk_to',
-      run_to: 'walk_to',
-      look: 'look_at',
-      watch: 'look_at',
-      stare_at: 'look_at',
-      examine: 'inspect',
-      study: 'inspect',
-      grab: 'pick_up',
-      take: 'pick_up',
-      pickup: 'pick_up',
-      drop: 'put_down',
-      place: 'put_down',
-      set_down: 'put_down',
-      toss: 'throw',
-      play: 'use',
-      play_with: 'use',
-      interact: 'use',
-      read: 'read',
-      write: 'write',
-      draw: 'draw',
-      scribble: 'draw',
-      sketch: 'draw',
-      doodle: 'draw',
-      paint: 'draw',
-      sleep: 'lie_down',
-      lie: 'lie_down',
-      rest: 'wait',
-      idle: 'wait',
-      pause: 'wait',
-      listen: 'wait',
-      think: 'wait',
-      stand: 'stand_up',
-      get_up: 'stand_up',
-      kneel: 'crouch',
-      squat: 'crouch',
-      knock: 'use',
-      try_door: 'use',
-      open: 'use',
-      look_out: 'use',
-      look_out_window: 'use',
-      water: 'use',
-      fill: 'use',
-      turn_on: 'use',
-      turn_off: 'use',
-      switch: 'use',
-      bounce: 'use',
-      twist: 'use',
-      shuffle: 'use',
-      solve: 'use',
-      tally: 'write',
-      wave: 'gesture',
-      shrug: 'gesture',
-      nod: 'gesture',
-      shake_head: 'gesture',
-      cover_face: 'gesture',
-      stretch: 'gesture',
-      point: 'gesture',
-      clap: 'gesture',
-      salute: 'gesture',
-      dance: 'gesture',
-      punch_wall: 'gesture',
-      hug_knees: 'sit',
-      look_around: 'gesture',
-      rub_head: 'gesture',
-      fists: 'gesture',
-    };
     const lk = /^look_(up|down|left|right|around)$/.exec(doRaw);
     if (lk && lk[1] !== 'around') {
       obj = lk[1];
     }
-    const d = lk ? (lk[1] === 'around' ? 'gesture' : 'look_at') : map[doRaw] || doRaw;
+    const d = canonicalAction(doRaw);
     switch (d) {
       case 'walk_to': {
         const r = resolve(obj);
-        if (!r) return `You don't know where "${obj}" is.`;
+        if (!r) return unavailable(`You don't know where "${obj}" is.`);
         await goTo(r, a.speed === 'fast' || a.run ? speed() * 1.6 : speed());
         return `You walk to ${r.name}, arriving at (${body.st.x.toFixed(2)}, ${body.st.z.toFixed(2)}).${body.navigation?.goal && r.stand && Math.hypot(body.navigation.goal[0] - r.stand[0], body.navigation.goal[1] - r.stand[1]) > 0.08 ? ' The requested point was obstructed; this is the nearest free standing position.' : ''}`;
       }
@@ -1248,7 +1187,7 @@ export function createActions(world, body, cb) {
       }
       case 'look_at': {
         const r = resolve(obj);
-        if (!r) return `You cannot aim at "${obj}": that target is not known.`;
+        if (!r) return unavailable(`You cannot aim at "${obj}": that target is not known.`);
         const observed = await observeTarget(r, token);
         if (observed) return `You face ${r.name}. Fresh optical observation: ${observed.text}`;
         await sleep(clampN(a.seconds, 1, 20, 3));
@@ -1256,7 +1195,7 @@ export function createActions(world, body, cb) {
       }
       case 'inspect': {
         const r = resolve(obj);
-        if (!r) return `There is no known target "${obj}" to inspect.`;
+        if (!r) return unavailable(`There is no known target "${obj}" to inspect.`);
         const observed = await observeTarget(r, token, {approach: true, inspect: true});
         body.setPosture('stand');
         if (observed) return `You inspect ${r.name}. Fresh optical observation: ${observed.text}`;
@@ -1281,7 +1220,7 @@ export function createActions(world, body, cb) {
         if (obj && !r)
           return `You cannot aim the optical frame at "${obj}": that target is not known.`;
         const observed = await observeTarget(r, token);
-        if (!observed) return 'Optical capture is unavailable; no new observation was acquired.';
+        if (!observed) return unavailable('Optical capture is unavailable; no new observation was acquired.');
         return `Current optical frame${r ? ' facing ' + r.name : ''}: ${observed.text}`;
       }
       case 'turn':
@@ -1417,7 +1356,7 @@ export function createActions(world, body, cb) {
         if (!USE[id]) {
           if (held() && !obj) id = held().id;
         }
-        if (!USE[id]) return `You aren't sure how to use "${obj}".`;
+        if (!USE[id]) return unavailable(`You aren't sure how to use "${obj}".`);
         return USE[id](verb, a.text, a);
       }
       default: {
@@ -1429,11 +1368,7 @@ export function createActions(world, body, cb) {
           await sleep(2);
           return '';
         }
-        body.gesture('look_around', 2.5);
-        await sleep(2.5);
-        return a.describe
-          ? `You ${String(a.describe).slice(0, 120)}.`
-          : `You try to ${String(a.do || 'act').replace(/_/g, ' ')}.`;
+        return unavailable(`Unsupported action "${String(a.do || '').slice(0, 80)}". No action was performed.`);
       }
     }
   }
@@ -1467,5 +1402,5 @@ export function createActions(world, body, cb) {
     body.clearGesture();
     for (const w of waiters.splice(0)) w.rej(INTERRUPT);
   }
-  return {run, tick, resolve, until, sleep, cancelAll, SEATS};
+  return {run, runResult, tick, resolve, until, sleep, cancelAll, SEATS};
 }
