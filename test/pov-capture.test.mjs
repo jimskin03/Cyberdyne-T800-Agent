@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
-import {createCaptureQueue,canonicalPov,supportAt,RECTS,CIRCLES,POV_CAPTURE_WIDTH,POV_CAPTURE_HEIGHT} from '../src/cell/world.js';
+import {createCaptureQueue,canonicalPov,POV_CAPTURE_WIDTH,POV_CAPTURE_HEIGHT} from '../src/cell/world/capture.js';
+import {supportAt} from '../src/cell/world/geometry.js';
+import {RECTS,CIRCLES} from '../src/cell/world/definition.js';
 
 test('concurrent capture callers share one frame and none are overwritten',async()=>{
  const queue=createCaptureQueue(),first=queue.request(),second=queue.request();let renders=0;
