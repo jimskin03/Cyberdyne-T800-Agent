@@ -1,3 +1,4 @@
+import {normalizeActionResult, failed} from '../actions/result.js';
 export function createActionQueue({
   state,
   actions,
@@ -41,31 +42,28 @@ export function createActionQueue({
     onDoing(describeAction(pending));
     if (/^(browser|slopcannon)$/.test(pending.do || '')) state.lastBrowserCheck = wallNow();
 
-    actions
-      .run(pending, token)
-      .then((result) => {
-        if (token.cancelled) return;
+    const execute = actions.runResult ? actions.runResult(pending, token) : actions.run(pending, token).then(normalizeActionResult);
+    execute
+      .then((outcome) => {
+        const result=normalizeActionResult(outcome);
+        if (token.cancelled || result.status==='cancelled') return;
         if (token.observation) state.pendingObservation = token.observation;
-        if (!result) return;
+        if (!result.text) return;
 
-        state.events.push({kind: 'result', text: result, t: formatTime(state.simMin)});
+        state.events.push({kind: 'result', text: result.text, status: result.status, t: formatTime(state.simMin)});
         if (/repair|create_3d|code|draw|write/.test(action.do || ''))
           lifeMemory.experience.observe({
             id: createId(),
-            kind: /could not|failed|unable|not reached/i.test(result)
-              ? 'task_failure'
-              : /repaired|created|built|finished|completed|wrote|drew|saved|installed|success/i.test(
-                    result,
-                  )
-                ? 'task_success'
-                : null,
+            kind: result.status === 'completed' ? 'task_success' : 'task_failure',
             source: 'world',
             observed: true,
-            text: result,
+            text: result.text,
             choice: describeAction(action),
           });
-        journal('result', result + ' ' + nervous.describe(), {
+        journal('result', result.text + ' ' + nervous.describe(), {
           action,
+          status: result.status,
+          success: result.status === 'completed',
           progress: Math.hypot(body.st.x - before.x, body.st.z - before.z),
           remaining: body.navigation?.remaining,
         });
@@ -73,15 +71,15 @@ export function createActionQueue({
       .catch((error) => {
         if (error === interrupt || token.cancelled || error?.name === 'AbortError') return;
         console.error(error);
-        const result = 'That action failed: ' + String(error?.message || error).slice(0, 220);
-        state.events.push({kind: 'result', text: result, t: formatTime(state.simMin)});
-        journal('result', result, {action, success: false});
+        const result = failed('That action failed: ' + String(error?.message || error).slice(0, 220));
+        state.events.push({kind: 'result', text: result.text, status: result.status, t: formatTime(state.simMin)});
+        journal('result', result.text, {action, status: result.status, success: false});
         lifeMemory.experience.observe({
           id: createId(),
           kind: 'task_failure',
           source: 'world',
           observed: true,
-          text: result,
+          text: result.text,
           choice: describeAction(action),
         });
       })
