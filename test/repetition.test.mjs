@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
-import vm from 'node:vm';
 import {actionKey,repeatedLine,repeatedSpeech,decisionIssues,failedActions,loopContext,variedMemory,speechHistory,repeatedSentences,stripRepeatedSentences} from '../src/repetition.js';
 import {createMind} from '../src/cell/mind.js';
+import {createSpeechCoordinator} from '../src/cell/app/speech-coordinator.js';
 const prior=['The drawings are behind me on that south wall. I am going to face it and photograph each one for the Producer.','I am going to turn and face the south wall. I can see the bird drawings when I am positioned right, then photograph them.'];
 const failures=[...Array.from({length:2},()=>[{kind:'act',text:'look at south_wall 5s'},{kind:'result',text:'You look around for "south_wall" but don\'t see it.'}]).flat()];
 
@@ -81,9 +80,8 @@ test('a model decision is repaired before execution and retains fresh substantiv
  }finally{globalThis.fetch=oldFetch;globalThis.setInterval=oldInterval;}
 });
 test('urgent queued model speech is deduplicated while deliberate operator repeats and new pain remain audible',()=>{
- const source=readFileSync(new URL('../src/cell/main.js',import.meta.url),'utf8'),say=source.slice(source.indexOf('function say('),source.indexOf('function runNext(')),spoken=[];
- const state={journal:[],lastSaid:'',pendingSpeech:null},audio={voice:{speaking:false,say(id,done,text){spoken.push(text);}}};
- const element={classList:{add(){},remove(){}}},context=vm.createContext({state,audio,repeatedSpeech,speechHistory,stripRepeatedSentences,Date,strip:s=>s.replace(/\[[^\]]*\]/g,''),$:()=>element,journal:(kind,text)=>state.journal.push({kind,text})});vm.runInContext(say,context);
- vm.runInContext("say('I will read the book while the radio plays.',false,{model:true});audio.voice.speaking=true;say('[deadpan] I will read the book while the radio plays.',true,{model:true,priority:'intercom'});",context);assert.equal(spoken.length,1);assert.equal(state.pendingSpeech,null);
- vm.runInContext("audio.voice.speaking=false;say('Yes',true,{model:false});say('Yes',true,{model:false});say('Stop, please!',true,{model:true,priority:'pain'});say('[shouting] Stop, please!',true,{model:true,priority:'pain'});",context);assert.equal(spoken.length,5);
+ const spoken=[],state={journal:[],spokenHistory:[],lastSaid:'',pendingSpeech:null},audio={voice:{speaking:false,say(id,done,text){spoken.push(text);}}};
+ const {say}=createSpeechCoordinator({state,audio,repeatedSpeech,speechHistory,stripRepeatedSentences,strip:s=>s.replace(/\[[^\]]*\]/g,''),journal:(kind,text)=>state.journal.push({kind,text})});
+ say('I will read the book while the radio plays.',false,{model:true});audio.voice.speaking=true;say('[deadpan] I will read the book while the radio plays.',true,{model:true,priority:'intercom'});assert.equal(spoken.length,1);assert.equal(state.pendingSpeech,null);
+ audio.voice.speaking=false;say('Yes',true,{model:false});say('Yes',true,{model:false});say('Stop, please!',true,{model:true,priority:'pain'});say('[shouting] Stop, please!',true,{model:true,priority:'pain'});assert.equal(spoken.length,5);
 });
