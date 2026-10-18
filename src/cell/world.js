@@ -3,66 +3,18 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {Reflector} from 'three/addons/objects/Reflector.js';
 import {createBot} from '../bot.js';
 import {TOOLS,buildTool} from '../tools.js';
+import {S,ROOM,FEATURES,RECTS,CIRCLES} from './world/definition.js';
+import {POV_CAPTURE_WIDTH,POV_CAPTURE_HEIGHT,canonicalPov,createCaptureQueue} from './world/capture.js';
+import {supportAt} from './world/geometry.js';
+export {S,ROOM,FEATURES,RECTS,CIRCLES} from './world/definition.js';
+export {POV_CAPTURE_WIDTH,POV_CAPTURE_HEIGHT,canonicalPov,createCaptureQueue} from './world/capture.js';
+export {supportAt} from './world/geometry.js';
 
 // The cell. World units are metres; the T-800 rig is built in its own units and scaled by S (≈1.85 m tall).
 // Floor plan (looking down, north = -z):  window on the north wall, door on the east wall, bed along the west wall,
 // sink + steel mirror + chalk wall on the south wall, table + stool in the north-east, tool hatch in the ceiling.
-export const S=.38;
-export const ROOM={x0:-2.5,x1:2.5,z0:-2,z1:2,h:3};
-export const POV_CAPTURE_WIDTH=1280,POV_CAPTURE_HEIGHT=720;
-export function canonicalPov(camera){camera.aspect=POV_CAPTURE_WIDTH/POV_CAPTURE_HEIGHT;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);return camera;}
-// All callers waiting for the next frame receive that frame. A cancelled caller
-// is removed without cancelling another observer's request.
-export function createCaptureQueue(){
- const waiting=new Set();
- function request(options={}){
-  const signal=options?.signal||(typeof options?.aborted==='boolean'?options:null);
-  return new Promise((resolve,reject)=>{
-   const entry={resolve,reject,signal,abort:null};
-   const cancel=()=>{waiting.delete(entry);signal?.removeEventListener('abort',entry.abort);reject(signal?.reason??new DOMException('Capture cancelled.','AbortError'));};
-   entry.abort=cancel;
-   if(signal?.aborted){cancel();return;}
-   waiting.add(entry);signal?.addEventListener('abort',cancel,{once:true});
-  });
- }
- function flush(render){
-  if(!waiting.size)return false;
-  const batch=[...waiting];waiting.clear();
-  for(const entry of batch)entry.signal?.removeEventListener('abort',entry.abort);
-  try{const frame=render();for(const entry of batch)entry.resolve(frame);}
-  catch(error){for(const entry of batch)entry.reject(error);}
-  return true;
- }
- return {request,flush,get pending(){return waiting.size;}};
-}
-export function supportAt(position,rects=[],circles=[]){
- const {x,y,z}=position;
- const surface=rects.find(r=>x>r.x0&&x<r.x1&&z>r.z0&&z<r.z1)||circles.find(c=>Math.hypot(x-c.x,z-c.z)<c.r);
- if(surface&&y>=surface.h-.05&&y<=surface.h+.3)return surface.id||'raised surface';
- return y>=-.05&&y<=.25?'floor':null;
-}
 const HATCH=new T.Vector3(.6,2.98,.3);
 
-export const FEATURES={
- window:{name:'the barred window',look:[.3,1.55,-2.1],stand:[.3,-1.45],desc:'a barred window in the north wall, sill at chest height'},
- door:{name:'the steel door',look:[2.5,1.55,.6],stand:[1.95,.6],desc:'heavy steel door with a small barred viewport and a food slot'},
- bed:{name:'the bed',look:[-2.05,.5,-.85],stand:[-1.3,-.8],seat:[-1.98,-.75],seatH:.47,desc:'a narrow steel cot with a thin mattress, along the west wall'},
- table:{name:'the table',look:[1.75,.78,-1.4],stand:[1.2,-.6],desc:'a small bolted-down table in the north-east corner'},
- computer:{name:'the CRT computer',look:[1.8,.97,-1.37],stand:[1.2,-.55],seat:[1.75,-.72],seatH:.47,face:Math.PI,desc:'an old CRT computer with a keyboard on the table; you can write programs and notes on it'},
- stool:{name:'the stool',look:[1.75,.45,-.75],stand:[1.2,-.55],seat:[1.75,-.72],seatH:.47,face:Math.PI,desc:'a bolted stool in front of the table'},
- sink:{name:'the sink',look:[.4,.85,1.8],stand:[.4,1.3],desc:'a steel sink with a push tap on the south wall'},
- mirror:{name:'the steel mirror',look:[.4,1.72,2],stand:[.4,1.3],desc:'a polished steel mirror above the sink'},
- chalk_wall:{name:'the chalk wall',look:[-1.55,1.45,2],stand:[-1.55,1.42],desc:'a bare stretch of the south wall you can write on with chalk'},
- plant:{name:'the potted plant',look:[-.6,.35,-1.75],stand:[-.6,-1.2],desc:'a small, slightly wilted potted plant under the window'},
- hatch:{name:'the ceiling hatch',look:[.6,3,.3],stand:[.6,.3],desc:'a square hatch in the ceiling; the tool arm comes out of it'},
- camera:{name:'the security camera',look:[-2.35,2.72,1.85],stand:[-1.5,1.1],desc:'a camera in the south-west corner, red light on: the audience watches through it'},
- drain:{name:'the floor drain',look:[0,0,.3],stand:[0,.85],desc:'a floor drain in the middle of the cell'},
- center:{name:'the middle of the cell',look:[0,1.2,.2],stand:[0,.2],desc:'open floor'},
- corner_se:{name:'the south-east corner',look:[2.5,1,2],stand:[2.15,1.62],desc:'an empty corner'},
- corner_sw:{name:'the south-west corner',look:[-2.5,1,2],stand:[-2.15,1.62],desc:'an empty corner under the camera'},
-};
-export const RECTS=[{x0:-2.5,x1:-1.62,z0:-1.9,z1:.2,h:.47,id:'bed'},{x0:1.22,x1:2.28,z0:-1.73,z1:-1.07,h:.755,id:'table'},{x0:.12,x1:.68,z0:1.62,z1:2,h:.86,id:'sink'}];
-export const CIRCLES=[{x:1.75,z:-.72,r:.2,h:.47,id:'stool'},{x:-.6,z:-1.75,r:.2,h:.32,id:'plant'}];
 
 export function createWorld(container,cb){
  const scene=new T.Scene();
@@ -480,11 +432,17 @@ export function createWorld(container,cb){
  }
  // click on the unit with a tool armed -> strike there
  const ray=new T.Raycaster(),ndc=new T.Vector2();let down=null;
- renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};});
- renderer.domElement.addEventListener('pointerup',e=>{if(!down)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y);down=null;if(moved>6)return;
+ const pointerDown=e=>{down={x:e.clientX,y:e.clientY};};
+ const pointerUp=e=>{if(!down)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y);down=null;if(moved>6)return;
   ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(ndc,povMain?pov:camera);const h=ray.intersectObjects(bot.pickables,false)[0];
-  if(h)cb.clickBot(h.point.clone(),bot.nearestTarget(h.point));else cb.clickEmpty?.();});
- if(insetEl)insetEl.addEventListener('click',()=>{povMain=!povMain;cb.swapped?.(povMain);});
+  if(h)cb.clickBot(h.point.clone(),bot.nearestTarget(h.point));else cb.clickEmpty?.();};
+ const insetClick=()=>{povMain=!povMain;cb.swapped?.(povMain);};
+ renderer.domElement.addEventListener('pointerdown',pointerDown);
+ renderer.domElement.addEventListener('pointerup',pointerUp);
+ if(insetEl)insetEl.addEventListener('click',insetClick);
+ function destroy(){
+  captures.cancelAll();removeEventListener('resize',resize);renderer.domElement.removeEventListener('pointerdown',pointerDown);renderer.domElement.removeEventListener('pointerup',pointerUp);insetEl?.removeEventListener('click',insetClick);controls.dispose?.();captureTarget.dispose();renderer.dispose();
+ }
  return {scene,renderer,camera,pov,controls,bot,items,features:FEATURES,update,strike,cancelStrike,capture,visible,surfaceAt,pushItems,knockItems,addCreation,breakItem,repairItem,placeSpot,get debris(){return debris;},
   chalkDraw,chalkText,chalkSet,chalkPen,chalkErase,chalkExport,chalkImport,surfaceInfo,surfaceIds:Object.keys(SURF_DEF),get chalkDescription(){return chalkDescribe();},
   setTime,birdLand,perchedBird,addMark,marks,burst,ring,emit:rawEmit,setPose(fn){poseFn=fn;},
@@ -495,6 +453,6 @@ export function createWorld(container,cb){
   set splash(v){splash=v;},crt:{set:crtSet,feed:crtFeed,get mode(){return crt.mode;}},flicker(s=1.5){flicker=s;},get lightsOn(){return lightsOn;},
   plant:{get health(){return plantHealth;},water(){plantHealth=Math.min(1,plantHealth+.25);leafM.color.set('#6f8a3c').lerp(new T.Color('#4caf50'),plantHealth);for(const l of leaves)l.rotation.x=.9-plantHealth*.5;},touch(){for(const l of leaves)l.rotation.z+=(Math.random()-.5)*.4;}},
   get povMain(){return povMain;},set povMain(v){povMain=v;},
-  setPhysicsPose(fn){physicsPose=fn;},setCameraDriver(fn){cameraDriver=fn;},
+  setPhysicsPose(fn){physicsPose=fn;},setCameraDriver(fn){cameraDriver=fn;},destroy,
   setDoorOpen(amount){const a=T.MathUtils.clamp(amount,0,1)*1.4;doorG.rotation.y=-a;doorG.position.set(ROOM.x1-.035-Math.sin(a)*.46,0,.14+Math.cos(a)*.46);surfaces.door.plane.visible=amount<.01;},RECTS,CIRCLES};
 }

@@ -7,6 +7,9 @@ import {robotDelivery} from './robot-voice.js';
 // Local ElevenLabs Foley and American Kokoro robot speech shared by both modes.
 export function createAudio({windowsVoice=false}={}){
  let ctx=null,master=null,muted=true,bank=null,humVolume=.05,radioStation=0;
+ const timers=new Set();
+ const later=(fn,ms)=>{const id=setTimeout(()=>{timers.delete(id);fn();},ms);timers.add(id);return id;};
+ const clearTimers=()=>{for(const id of timers)clearTimeout(id);timers.clear();};
  const desired=new Map();
  function setLoop(slot,name,volume){desired.set(slot,{name,volume});bank?.loop(slot,name,volume);}
  function init(){if(ctx)return;ctx=new AudioContext();master=ctx.createGain();master.gain.value=0;
@@ -41,7 +44,7 @@ export function createAudio({windowsVoice=false}={}){
  function speak(text,done){
   const my=++runId;voice.lastError=null;
   const parts=segments(text).flatMap(s=>s.pause?[s]:s.text.match(/.{1,380}(?:\s|$)|.{1,380}/g).map(t=>({...s,text:t.trim()})));let i=0;
-  const next=()=>{if(my!==runId)return;if(i>=parts.length){done();return;}const part=parts[i++];if(part.pause){setTimeout(next,260);return;}
+  const next=()=>{if(my!==runId)return;if(i>=parts.length){done();return;}const part=parts[i++];if(part.pause){later(next,260);return;}
    if(windowsVoice){
     if(!('speechSynthesis' in window)){voice.lastError='Windows speech is unavailable in this browser.';done();return;}
     const utterance=new SpeechSynthesisUtterance(part.text),list=systemVoices(),chosen=list.find(v=>v.name===selectedWindows)||list[0];
@@ -56,17 +59,18 @@ export function createAudio({windowsVoice=false}={}){
    const text=textOverride||LINES[id]?.text||'';const cue=model?vocalCue(vocalize||vocalTag(text)):null;if(!text&&!cue)return 0;stop();
    const lead=cue&&bank?.play(cue)?bank.duration(cue):0;
    const my=runId;
-   if(muted){voice.speaking=true;const ms=Math.min(9000,1800+strip(text).length*62);setTimeout(()=>{if(my!==runId)return;voice.speaking=false;onDone&&onDone();},ms);return 0;}
+   if(muted){voice.speaking=true;const ms=Math.min(9000,1800+strip(text).length*62);later(()=>{if(my!==runId)return;voice.speaking=false;onDone&&onDone();},ms);return 0;}
    voice.speaking=true;const begin=()=>{if(my!==runId)return;speak(text,()=>{voice.speaking=false;onDone&&onDone();});};
-   if(lead)setTimeout(begin,lead*1000);else begin();return lead;
+   if(lead)later(begin,lead*1000);else begin();return lead;
   },
   has:()=>false,duration:()=>null,
   get voices(){return voicesList();},
   setVoice(name){if(windowsVoice){selectedWindows=String(name||'').replace(/^windows:/,'');return name;}return voiceName;},
   get mp3Count(){return 0;},
  };
- function stop(){runId++;neural.stop();if('speechSynthesis' in window)speechSynthesis.cancel();voice.speaking=false;}
- return {enable,sfx,voice,stopVoice:stop,radio,rain,punk,baby,
+ function stop(){runId++;clearTimers();neural.stop();if('speechSynthesis' in window)speechSynthesis.cancel();voice.speaking=false;}
+ function destroy(){stop();bank?.stopAll();desired.clear();const current=ctx;ctx=null;master=null;bank=null;if(current?.state!=='closed')current?.close?.().catch?.(()=>{});}
+ return {enable,sfx,voice,stopVoice:stop,destroy,radio,rain,punk,baby,
   reaction(pain,despair){const cue=reactionCue(pain,despair);return cue? bank?.play(cue,{impact:true})||false:false;},
   stopTools(){bank?.stopTools();},
   async toggle(){if(muted)return enable();muted=true;stop();bank?.stopAll();if(ctx)master.gain.setTargetAtTime(0,ctx.currentTime,.05);return false;},

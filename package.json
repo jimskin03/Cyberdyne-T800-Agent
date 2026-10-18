@@ -12,6 +12,8 @@
     "api": "node --env-file-if-exists=.env tools/api-server.mjs",
     "brain:validate": "node tools/validate-brain.mjs",
     "test": "node --test test/*.test.mjs",
+    "format": "prettier --write src/cell/main.js src/cell/actions.js",
+    "format:check": "prettier --check src/cell/main.js src/cell/actions.js",
     "privacy:check": "node tools/privacy-check.mjs"
   },
   "dependencies": {
@@ -20,6 +22,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
+    "prettier": "3.9.10",
     "vite": "7.3.7"
   },
   "overrides": {
