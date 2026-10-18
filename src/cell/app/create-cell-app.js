@@ -9,8 +9,10 @@ export function createCellApp({
   cancelFrame = (id) => cancelAnimationFrame(id),
   setIntervalFn = (fn, ms) => setInterval(fn, ms),
   clearIntervalFn = (id) => clearInterval(id),
+  teardown = [],
 } = {}) {
   let running = false;
+  let destroyed = false;
   let frameId = null;
   let hiddenTimer = null;
   let saveTimer = null;
@@ -39,7 +41,7 @@ export function createCellApp({
   }
 
   function start() {
-    if (running) return;
+    if (running || destroyed) return;
     running = true;
     hiddenTimer = setIntervalFn(tickHidden, 250);
     saveTimer = setIntervalFn(persist, 5000);
@@ -57,11 +59,28 @@ export function createCellApp({
     frameId = hiddenTimer = saveTimer = null;
   }
 
+  function destroy() {
+    if (destroyed) return;
+    stop();
+    destroyed = true;
+    for (const cleanup of teardown) {
+      try {
+        cleanup?.();
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  }
+
   return {
     start,
     stop,
+    destroy,
     get running() {
       return running;
+    },
+    get destroyed() {
+      return destroyed;
     },
   };
 }

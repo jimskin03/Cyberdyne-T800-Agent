@@ -561,6 +561,7 @@ export function createActions(world, body, cb) {
             style: a.style || '',
             surface: info,
             box: [((ar.u1 - ar.u0) / 100) * info.W, ((ar.v1 - ar.v0) / 100) * info.H],
+            token: tok,
           }).then(
             (r) => {
               res = r;
@@ -861,6 +862,7 @@ export function createActions(world, body, cb) {
       name,
       idea,
       current: prev ? prev.versions[prev.versions.length - 1].html : null,
+      token: tok,
     }).then(
       (r) => {
         res = r;

@@ -33,7 +33,10 @@ export function createCaptureQueue(){
   catch(error){for(const entry of batch)entry.reject(error);}
   return true;
  }
- return {request,flush,get pending(){return waiting.size;}};
+ function cancelAll(reason=new DOMException('Capture queue destroyed.','AbortError')){
+  for(const entry of [...waiting]){waiting.delete(entry);entry.signal?.removeEventListener('abort',entry.abort);entry.reject(reason);}
+ }
+ return {request,flush,cancelAll,get pending(){return waiting.size;}};
 }
 export function supportAt(position,rects=[],circles=[]){
  const {x,y,z}=position;
@@ -480,11 +483,17 @@ export function createWorld(container,cb){
  }
  // click on the unit with a tool armed -> strike there
  const ray=new T.Raycaster(),ndc=new T.Vector2();let down=null;
- renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};});
- renderer.domElement.addEventListener('pointerup',e=>{if(!down)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y);down=null;if(moved>6)return;
+ const pointerDown=e=>{down={x:e.clientX,y:e.clientY};};
+ const pointerUp=e=>{if(!down)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y);down=null;if(moved>6)return;
   ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(ndc,povMain?pov:camera);const h=ray.intersectObjects(bot.pickables,false)[0];
-  if(h)cb.clickBot(h.point.clone(),bot.nearestTarget(h.point));else cb.clickEmpty?.();});
- if(insetEl)insetEl.addEventListener('click',()=>{povMain=!povMain;cb.swapped?.(povMain);});
+  if(h)cb.clickBot(h.point.clone(),bot.nearestTarget(h.point));else cb.clickEmpty?.();};
+ const insetClick=()=>{povMain=!povMain;cb.swapped?.(povMain);};
+ renderer.domElement.addEventListener('pointerdown',pointerDown);
+ renderer.domElement.addEventListener('pointerup',pointerUp);
+ if(insetEl)insetEl.addEventListener('click',insetClick);
+ function destroy(){
+  captures.cancelAll();removeEventListener('resize',resize);renderer.domElement.removeEventListener('pointerdown',pointerDown);renderer.domElement.removeEventListener('pointerup',pointerUp);insetEl?.removeEventListener('click',insetClick);controls.dispose?.();captureTarget.dispose();renderer.dispose();
+ }
  return {scene,renderer,camera,pov,controls,bot,items,features:FEATURES,update,strike,cancelStrike,capture,visible,surfaceAt,pushItems,knockItems,addCreation,breakItem,repairItem,placeSpot,get debris(){return debris;},
   chalkDraw,chalkText,chalkSet,chalkPen,chalkErase,chalkExport,chalkImport,surfaceInfo,surfaceIds:Object.keys(SURF_DEF),get chalkDescription(){return chalkDescribe();},
   setTime,birdLand,perchedBird,addMark,marks,burst,ring,emit:rawEmit,setPose(fn){poseFn=fn;},
@@ -495,6 +504,6 @@ export function createWorld(container,cb){
   set splash(v){splash=v;},crt:{set:crtSet,feed:crtFeed,get mode(){return crt.mode;}},flicker(s=1.5){flicker=s;},get lightsOn(){return lightsOn;},
   plant:{get health(){return plantHealth;},water(){plantHealth=Math.min(1,plantHealth+.25);leafM.color.set('#6f8a3c').lerp(new T.Color('#4caf50'),plantHealth);for(const l of leaves)l.rotation.x=.9-plantHealth*.5;},touch(){for(const l of leaves)l.rotation.z+=(Math.random()-.5)*.4;}},
   get povMain(){return povMain;},set povMain(v){povMain=v;},
-  setPhysicsPose(fn){physicsPose=fn;},setCameraDriver(fn){cameraDriver=fn;},
+  setPhysicsPose(fn){physicsPose=fn;},setCameraDriver(fn){cameraDriver=fn;},destroy,
   setDoorOpen(amount){const a=T.MathUtils.clamp(amount,0,1)*1.4;doorG.rotation.y=-a;doorG.position.set(ROOM.x1-.035-Math.sin(a)*.46,0,.14+Math.cos(a)*.46);surfaces.door.plane.visible=amount<.01;},RECTS,CIRCLES};
 }
