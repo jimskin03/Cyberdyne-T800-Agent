@@ -84,9 +84,11 @@ test('desktop startup, mocked connection, consecutive replies, fresh inspection 
   },{timeout:60_000}).toBeGreaterThan(0);
   await expect.poll(()=>page.evaluate(()=>window.__CELL.state.journal.some(entry=>entry.kind==='result'&&/table|puzzle cube/i.test(entry.text))),{timeout:60_000}).toBe(true);
 
-  await page.locator('#pc-btn').click();
+  // The POV inset overlaps the top bar. C and Escape are the advertised shortcuts and do not depend on that hit target.
+  await page.locator('#ask').blur();
+  await page.keyboard.press('c');
   await expect(page.locator('#pc')).toBeVisible();
-  await page.locator('#pc-close').click();
+  await page.keyboard.press('Escape');
   await expect(page.locator('#pc')).toBeHidden();
 
   await page.locator('#agent-disconnect').click();
