@@ -1,39 +1,73 @@
 # Cyberdyne T800 Agent Embodiment Project
 
-A standalone Three.js containment-cell scene with a procedural robot, movable objects, physics, tool controls, water effects, climate controls, and a built-in computer. Connect your own agent through an API key, OAuth, or a local endpoint.
+[![Verify project](https://github.com/jimskin03/Cyberdyne-T800-Agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jimskin03/Cyberdyne-T800-Agent/actions/workflows/ci.yml)
+
+A standalone Three.js containment-cell scene with a procedural T-800 robot, movable objects, physics, tool controls, water effects, climate controls, and a built-in computer. You can explore it offline, or connect your own agent through an API key, OAuth, or a local endpoint.
+
+This repository is a fork of [newbmechanix-ship-it/Cyberdyne-T800-Agent-Embodiment-Project](https://github.com/newbmechanix-ship-it/Cyberdyne-T800-Agent-Embodiment-Project). It adds the responsive and minimizable UI, browser CI, and the staged refactor from issue #8.
 
 ## Run locally
 
 Requires Node.js 22.12 or newer and npm.
 
 ```sh
-git clone https://github.com/newbmechanix-ship-it/Cyberdyne-T800-Agent-Embodiment-Project.git
-cd Cyberdyne-T800-Agent-Embodiment-Project
+git clone https://github.com/jimskin03/Cyberdyne-T800-Agent.git
+cd Cyberdyne-T800-Agent
 npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:5340 and select **Open the feed**. No API key is needed. The local scene uses browser speech and browser storage. State is scoped to this package. **Reset session memory** starts fresh with AI off; **Restore previous session** provides one local undo slot. Neither saved state nor the undo slot is included in source exports. AI starts off for a new visitor and remembers the operator's later choice.
+Open http://127.0.0.1:5340 and select **Open the feed**. No API key is needed: the offline scene uses browser speech and browser storage, and AI starts off for a new visitor. **Reset session memory** starts fresh with AI off; **Restore previous session** restores the one local undo slot.
 
-On desktop, use the **−** button in JSON Brain, Mind Stream, Thoughts, or Dialogue to minimize each panel independently. Its title or label stays visible; select **+** to restore it. Minimizing preserves the conversation, settings, and memory selection, and the intercom remains available. Drag the JSON Brain title bar to move the box (the minimize button remains clickable). You can also focus its title bar and use the arrow keys to move it or **Home** to reset its position.
+`npm run build` writes a static production build to `dist/`, and `npm run preview` serves it on http://127.0.0.1:5340.
 
-On phones and short landscape screens, **Controls** opens the operator settings, including **AI mind**, and **Memory** opens the interactive JSON brain. Each panel scrolls and has a **Close** button. Selecting a tool closes Controls so you can tap the unit in the scene.
+## Using the interface
 
-```sh
-npm test
-npm run build
-npm run brain:validate
-npm audit
-npm run privacy:check
-```
+- **Desktop:** the **−** button on JSON Brain, Mind Stream, Thoughts, or Dialogue minimizes that panel independently, leaving its title or label visible; **+** restores it. Minimizing keeps the conversation, settings, and memory selection, and the intercom stays available. To move the JSON Brain box, drag its title bar (no hold needed; the minimize button stays clickable). You can also focus the title bar and use the arrow keys, or press **Home** to reset its position.
+- **Phones and short landscape screens:** **Controls** opens the operator settings, including **AI mind**, and **Memory** opens the interactive JSON brain. Each panel scrolls and has a **Close** button (Escape also closes it). Selecting a tool closes Controls so you can tap the unit.
+- **Keyboard:** 1–8 arm a tool, G grapple, C his computer, V swap POV, P punk, B baby, M mute, H hide UI.
 
-The privacy check requires Git and scans tracked and untracked publication candidates, respecting `.gitignore`. It reports file names and line numbers without printing matched secrets. A clean scan does not establish that all possible personal information has been found.
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Vite dev server on 127.0.0.1:5340, proxying `/llm` to the backend |
+| `npm run build` / `npm run preview` | Production build to `dist/` and local preview |
+| `npm run api` (alias `npm run brain`) | Optional AI backend adapter on loopback port 18081, reading `.env` |
+| `npm test` | Node unit and integration tests (`test/*.test.mjs`) |
+| `npm run test:browser` | Playwright Chromium smoke tests against a mocked model server |
+| `npm run format:check` / `npm run format` | Prettier check or fix for `src/cell/main.js` and `src/cell/actions.js` |
+| `npm run brain:validate` | Validate a JSON brain through the runtime |
+| `npm run privacy:check` | Scan publication candidates for secrets, emails, and local paths |
+| `npm audit` | Dependency vulnerability audit |
+
+The browser tests start `test/browser/mock-llm.mjs` and the dev server themselves. They need Playwright's Chromium (`npx playwright install --with-deps chromium`). The privacy check needs Git. It reports file names and line numbers without printing matched values, and a clean scan does not guarantee that all personal information was found.
+
+## Project structure
+
+The issue #8 staged refactor split the former large modules into tested boundaries. See [the refactor baseline](docs/refactor-baseline.md) and [the staged refactor results](docs/refactor-results.md) for details and measurements.
+
+| Path | Responsibility |
+| --- | --- |
+| `src/cell/main.js` | Scene entry point that wires the modules together |
+| `src/cell/app/` | App lifecycle, thought scheduling, action queue, speech coordination |
+| `src/cell/ai/` | Service-neutral LLM client, connection state, prompts, parsers, creative generation |
+| `src/cell/actions/` | Shared supported-action catalog and explicit action results (`completed`, `blocked`, `unavailable`, `cancelled`, `failed`) |
+| `src/cell/actions.js` | Behavior-specific action executors |
+| `src/cell/ui/` | Connection, intercom, HUD, and computer controllers |
+| `src/cell/world/` | Renderer-free room definition, POV capture, geometry helpers (`world.js` keeps the renderer) |
+| `src/cell/storage/` | Browser session persistence with reset and undo |
+| `src/cell/responsive-ui.*`, `panel-minimize.*`, `panel-drag.*` | Compact layout, panel minimize, and draggable JSON Brain |
+| `tools/api-server.mjs`, `tools/api/` | Backend CLI plus config, connection state, request validation, and upstream transport |
+| `test/`, `test/browser/` | Node tests and Playwright smoke tests with a mock LLM |
 
 ## Included brain and personalization
 
-Yes: the full [default JSON brain](src/cell/default-brain.json) ships in the repository, source ZIP and built app: **693 memory nodes, 303 pathways, and 554 associations**. It is an authored simulated biography with retrieval and experience rules, independent of any AI service. Saved play sessions and credentials are excluded. You can keep it, adapt it, replace it with your own graph, or start empty.
+The full [default JSON brain](src/cell/default-brain.json) ships in the repository and the built app: **693 memory nodes, 303 pathways, and 554 associations**. It is an authored, fictional simulated biography that is independent of any AI service. The whole graph stays local; only selected, bounded recall enters a provider prompt. You can keep it, adapt it, replace it, or start from [the starter example](examples/brain.starter.json):
 
-Start with [Make the experience your own](docs/CUSTOMIZATION.md). It includes copyable instructions for your coding agent, a map of customization points, and guidance on character identity, personality, progress and privacy.
+```sh
+npm run brain:validate -- examples/brain.starter.json "repair radio"
+```
 
 | Guide | Use it to |
 | --- | --- |
@@ -43,34 +77,23 @@ Start with [Make the experience your own](docs/CUSTOMIZATION.md). It includes co
 | [New scenarios](docs/SCENARIOS.md) | Build another setting with consistent physics, perception, actions and memory |
 | [New features](docs/EXTENDING.md) | Add interactions, sensors, controls and backend capabilities |
 
-The embodied character can use the implemented actions; your coding agent can change the host project's source. New scenarios and host features require implementation rather than only intercom instructions. The current cell is the included starting scenario.
+[AGENTS.md](AGENTS.md) gives coding agents the repository architecture and verification rules.
 
-## Create your own JSON brain
+## Connecting an AI mind (optional)
 
-Follow [the JSON brain guide](docs/JSON-BRAIN.md) to create a character with our memory nodes, cue pathways, associations, explicit personality effects, optional experience learning, and live recall visualization. Start with [the validated fictional example](examples/brain.starter.json):
+1. Copy `.env.example` to `.env` (ignored by Git) and set `AGENT_NAME`, `API_BASE_URL`, the model IDs, and either `API_KEY` or the OAuth settings. Base URLs must be HTTPS, or HTTP on loopback.
+2. Run `npm run api` in a second terminal. The adapter listens on loopback port 18081 only, and keys and OAuth tokens stay in that backend process.
+3. Run `npm run dev`. The dev server forwards `/llm` requests to the adapter.
+4. Turn on **AI mind** in Controls and complete sign-in if asked. Alternatively, leave the API fields in `.env` blank and use **OpenAI-compatible API** or **Invite agent** in the MIND controls once the adapter is running.
 
-```sh
-npm run brain:validate -- examples/brain.starter.json "repair radio"
-```
+A static deployment (`dist/` on any web server) has no `/llm` backend, so the scene runs offline and AI shows as unavailable unless you add your own backend and proxy. No service or model is chosen for you; requests use your account and may incur charges. Automated tests use mocks only. See [the API integration guide](docs/API-INTEGRATION.md) for request and response formats and OAuth details.
 
-## Connect your own APIs
-
-[The API integration guide](docs/API-INTEGRATION.md) covers the service-neutral backend, agent naming, API keys or OAuth sign-in, model mapping, exact requests/responses, text and vision support, and instructions to hand to your coding agent. [AGENTS.md](AGENTS.md) gives agents the repository architecture and verification rules.
-
-Configure your own compatible service in ignored local `.env` using `.env.example`, including `AGENT_NAME` and the service's model IDs. Run `npm run api` in another terminal. Choose API-key, OAuth or unauthenticated local-server access; OAuth requires registering your own client with the service. You can also leave those API fields blank and, once the adapter is running, use **OpenAI-compatible API** or **Invite agent** in the MIND controls. Enable **AI mind** when you intend to make requests, and complete sign-in if requested. Keys and OAuth tokens remain in the backend process. The development server forwards `/llm` requests to loopback port 18081; static deployment needs a separate backend and proxy.
-
-No service or model is required or selected for you. Requests use your configured account and may incur usage charges. Automated tests use mocks. A separate private local test profile exercised a real text reply; compatibility with each user's service and OAuth registration still needs verification.
-
-If the character does not answer, check the status below the chat input. **AI off** means AI mind is not selected. **AI unavailable** means the configured brain service is not reachable. Starting the scene alone does not start a provider. Ordinary conversation uses a compact prompt and skips fresh vision; direct replies have a 30-second deadline and explicit failure status. New chat messages wait behind an answer already in progress instead of repeatedly cancelling it.
-
-The account-connected browser, donation/payment system, other scenes, Luna autopilot service, Si BoT provider service, and neural voice server are excluded. The local Luna character remains available for the scripted berserker sequence. The scene includes a service-neutral default JSON brain preserving the authored experiences: 693 memory nodes, 303 pathways, and 554 associations, with calendar recall and experience-driven behavior. The whole graph stays local; only selected, bounded recall enters a provider prompt. Optional AI features are not required to explore the cell.
-
-Sensation simulation and pulse animation stay local and continuous. Heartbeats do not create model requests or append full sensation snapshots. Background thinking defaults to once every 30 wall-clock seconds, new physical events are coalesced, and direct questions take priority.
-
-## Publication status
-
-See [RELEASE-REVIEW.md](RELEASE-REVIEW.md) for cleanup details and remaining release decisions. The repository is initially private while the source license and bundled audio redistribution rights are finalized. The source ZIP contains only committed project files; API credentials and saved browser sessions are excluded.
+If the character does not answer, check the status below the chat input: **AI off** means AI mind is not selected, and **AI unavailable** means the backend is not reachable. Background thinking defaults to once every 30 wall-clock seconds, and direct questions take priority.
 
 ## Continuous integration
 
-The checked-in GitHub Actions workflow runs Node tests, mocked Chromium smoke coverage, brain validation, the production build, privacy checks, and the dependency audit. See [the refactor baseline](docs/refactor-baseline.md) for the starting point and [the staged refactor results](docs/refactor-results.md) for the implemented boundaries, verification, and measured bundle deltas. The older [workflow example](docs/ci-workflow.example.yml) remains as a minimal reference.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request using Node 22. It runs `npm ci`, installs Playwright Chromium, then runs `npm test`, `npm run test:browser`, `npm run brain:validate`, `npm run build`, `npm run privacy:check`, and `npm audit`. Browser failure traces are uploaded as an artifact. The older [workflow example](docs/ci-workflow.example.yml) remains as a minimal reference.
+
+## Publication status
+
+This fork is public on GitHub. No source license has been chosen yet (there is no LICENSE file), and redistribution rights for the bundled audio are still unresolved. See [RELEASE-REVIEW.md](RELEASE-REVIEW.md) for the cleanup record and the remaining release decisions. The account-connected browser, donation and payment system, other scenes, and external voice and autopilot services from the original project are excluded.
