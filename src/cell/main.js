@@ -272,26 +272,70 @@ function bindRange(id,key,fmt,parse=Number){const el=$(id),out=$(id+'-v');el.val
 bindRange('cadence','backgroundSeconds',v=>v+' seconds');
 $('timescale').value=String(state.timeScale);$('timescale').onchange=e=>{const now=Date.now();state.simMin=advanceTime(state.simMin,state.lastClockAt,now,state.timeScale);state.lastClockAt=now;state.timeScale=Number(e.target.value);save();};
 $('heart-snd').checked=state.heartSound;$('heart-snd').onchange=e=>{state.heartSound=e.target.checked;save();};
-$('use-brain').onchange=e=>{try{localStorage.setItem('cell-public-ai.enabled',String(e.target.checked));}catch{}mind.setEnabled(e.target.checked);if(!e.target.checked){if(state.thinking){state.thinking.ac.abort();state.events.unshift(...state.thinking.consumed);state.thinking=null;$('thinking').classList.remove('on');}if(!state.operatorBusy){actions.cancelAll();state.queue=[];}}toast(e.target.checked?'Mind on.':'Mind off: intercom orders still work.');};
-$('agent-connect').onclick=async()=>{
+$('use-brain').onchange=e=>{try{localStorage.setItem('cell-public-ai.enabled',String(e.target.checked));}catch{}mind.setEnabled(e.target.checked);if(!e.target.checked){if(state.thinking){state.thinking.ac.abort();state.events.unshift(...state.thinking.consumed);state.thinking=null;$('thinking').classList.remove('on');}if(!state.operatorBusy){actions.cancelAll();state.queue=[];}}paintAgentConnection();toast(e.target.checked?'Mind on.':'Mind off: intercom orders still work.');};
+function enableMind(){$('use-brain').checked=true;$('use-brain').dispatchEvent(new Event('change'));}
+function hideConnectionForms(){for(const [form,button] of [['openai-api-form','openai-api-toggle'],['invite-agent-form','invite-agent-toggle']]){$(form).hidden=true;$(button).setAttribute('aria-expanded','false');}}
+function clearConnectionSecrets(){$('openai-key').value='';$('invite-key').value='';}
+function toggleConnectionForm(name){
+ const open=name==='openai'?$('openai-api-form').hidden:name==='invite'?$('invite-agent-form').hidden:false;
+ hideConnectionForms();clearConnectionSecrets();
+ if(!open)return;
+ const form=name==='openai'?'openai-api-form':'invite-agent-form',button=name==='openai'?'openai-api-toggle':'invite-agent-toggle';
+ $(form).hidden=false;$(button).setAttribute('aria-expanded','true');$(name==='openai'?'openai-base':'invite-name').focus();
+}
+function syncInviteFields(){
+ const alternative=$('invite-alternative').value,signIn=alternative==='sign-in',keyed=alternative==='api-key';
+ $('invite-base-row').hidden=signIn;$('invite-model-row').hidden=signIn;$('invite-key-row').hidden=!keyed;
+ $('invite-base').required=!signIn;$('invite-model').required=!signIn;$('invite-key').required=keyed;
+ $('invite-base').placeholder=keyed?'https://service.example/v1':'http://127.0.0.1:1234/v1';
+}
+async function postConnection(body){
+ let response;try{response=await fetch('/llm/connection',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(5000)});}
+ catch(error){throw Error(error?.name==='TimeoutError'||error?.name==='AbortError'||/Failed to fetch|NetworkError/i.test(error?.message||'')?'Agent adapter is not running. Start it with npm run api, then try again.':'Agent connection is unavailable.');}
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok)throw Error(typeof data.error==='string'?data.error.slice(0,180):'Connection was rejected.');
+ return data;
+}
+async function connectConfiguredAgent(){
  const popup=window.open('about:blank','agent-connection','width=560,height=720');
  try{
-  await mind.refresh();
+  await mind.refresh();paintAgentConnection();
   if(mind.st.auth.mode==='oauth'&&mind.st.auth.loginUrl&&!mind.st.auth.connected){
-   if(!popup){toast('Allow the sign-in popup and select Connect agent again.');return;}
-   $('use-brain').checked=true;$('use-brain').dispatchEvent(new Event('change'));
-   popup.opener=null;popup.location.href=mind.st.auth.loginUrl;toast('Complete sign-in, then return to the scene.');
+   if(!popup){toast('Allow the sign-in popup and try again.');return;}
+   enableMind();popup.opener=null;popup.location.href=mind.st.auth.loginUrl;toast('Complete sign-in, then return to the scene.');
   }else{
    popup?.close();
-   if(!mind.st.online){toast(mind.st.authRequired?'Configure credentials in your local agent adapter.':'Start your configured agent adapter, then connect again.');return;}
-   $('use-brain').checked=true;$('use-brain').dispatchEvent(new Event('change'));toast(mind.st.agentName+' connected.');
+   if(!mind.st.online){toast(mind.st.unconfigured?'No API configured. Add an OpenAI-compatible API or invite an agent.':mind.st.authRequired?'Configure credentials in your local agent adapter.':'Start your configured agent adapter, then connect again.');return;}
+   enableMind();toast(mind.st.agentName+' connected.');
   }
  }catch{popup?.close();toast('Agent connection is unavailable. Check your adapter configuration.');}
+}
+$('openai-api-toggle').onclick=()=>toggleConnectionForm('openai');
+$('invite-agent-toggle').onclick=()=>toggleConnectionForm('invite');
+$('openai-api-cancel').onclick=()=>{hideConnectionForms();clearConnectionSecrets();};
+$('invite-agent-cancel').onclick=()=>{hideConnectionForms();clearConnectionSecrets();};
+$('invite-alternative').onchange=syncInviteFields;syncInviteFields();
+$('openai-api-form').onsubmit=async event=>{
+ event.preventDefault();const apiKey=$('openai-key').value;$('openai-key').value='';
+ try{await postConnection({kind:'openai-compatible',baseUrl:$('openai-base').value.trim(),apiKey,textModel:$('openai-model').value.trim(),visionModel:$('openai-vision').value.trim()});hideConnectionForms();await mind.refresh();enableMind();paintAgentConnection();toast('OpenAI-compatible API connected.');}
+ catch(error){toast(error.message);}
 };
+$('invite-agent-form').onsubmit=async event=>{
+ event.preventDefault();const alternative=$('invite-alternative').value,apiKey=$('invite-key').value;$('invite-key').value='';
+ const body={kind:'invite',alternative,agentName:$('invite-name').value.trim()};
+ if(alternative!=='sign-in'){body.baseUrl=$('invite-base').value.trim();body.textModel=$('invite-model').value.trim();}
+ if(alternative==='api-key')body.apiKey=apiKey;
+ try{await postConnection(body);hideConnectionForms();if(alternative==='sign-in'){await connectConfiguredAgent();return;}await mind.refresh();enableMind();paintAgentConnection();toast((mind.st.agentName||'Agent')+' invited.');}
+ catch(error){toast(error.message);}
+};
+$('agent-connect').onclick=connectConfiguredAgent;
 $('agent-disconnect').onclick=async()=>{
  $('use-brain').checked=false;$('use-brain').dispatchEvent(new Event('change'));
- if(mind.st.auth.mode==='oauth')try{await fetch('/llm/auth/logout',{method:'POST',headers:{'content-type':'application/json'},body:'{}',signal:AbortSignal.timeout(3000)});}catch{}
- await mind.refresh();toast('Agent disconnected.');
+ const oauth=mind.st.auth.mode==='oauth'||mind.st.connection?.alternative==='sign-in';
+ clearConnectionSecrets();hideConnectionForms();
+ try{await fetch('/llm/connection',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind:'clear'}),signal:AbortSignal.timeout(3000)});}catch{}
+ if(oauth)try{await fetch('/llm/auth/logout',{method:'POST',headers:{'content-type':'application/json'},body:'{}',signal:AbortSignal.timeout(3000)});}catch{}
+ await mind.refresh();paintAgentConnection();toast('Agent disconnected.');
 };
 $('talk').value=state.talkLevel;$('talk').onchange=e=>{state.talkLevel=e.target.value;save();};
 function noise(kind,on){if(on&&inPeace()){toast('Paid peace is active.');return;}state[kind]=on;$(kind).classList.toggle('on',on);$(kind).textContent=(kind==='punk'?'Punk music':'Baby crying')+(on?' · ON':'');
@@ -308,7 +352,7 @@ function intercom(q){
  q=(q||'').trim().slice(0,300);if(!q||!state.started)return;$('ask').value='';
  const command=operatorCommand(q);
  addEvent('intercom',`A voice crackles from the speaker by the door: "${q}"`,!command);
- if(!command){state.replyError='';if(!mind.st.enabled)toast('AI is off. Enable AI mind to get replies.');else if(!mind.st.online)toast('AI is unavailable. Start a configured brain service.');return;}
+ if(!command){state.replyError='';if(!mind.st.enabled)toast('AI is off. Enable AI mind to get replies.');else if(mind.st.unconfigured)toast('No API configured. Add an OpenAI-compatible API or invite an agent.');else if(!mind.st.online)toast('AI is unavailable. Start a configured brain service.');return;}
  if(waterMode?.active)waterMode.exit();
  const decision=Array.isArray(command)?{actions:command}:command;
  for(const a of decision.actions)if((a.target||a.object)&&!actions.resolve(a.target||a.object)){toast('No such target in this cell: '+(a.target||a.object));return;}
@@ -335,19 +379,24 @@ $('go').onclick=async()=>{await restored;try{await Promise.race([audio.enable(),
  addEvent('event',state.journal.length?'You come back online in the cell. The same cell.':'You come online. You are standing in a small cell. Nothing is holding you down.');state.beatsSince=99;};
 let displayedAgentName='';
 const hudEls={};for(const k of['pain','fear','despair','dignity'])hudEls[k]=[$('m-'+k),$('v-'+k)];
-function hud(){
+function paintAgentConnection(){
  const name=mind.st.agentName||'Agent';
  if(name!==displayedAgentName){document.querySelectorAll('[data-agent-name]').forEach(el=>el.textContent=name);displayedAgentName=name;}
- $('agent-connection-state').textContent=name+' · '+(mind.st.authRequired?(mind.st.auth.mode==='oauth'?'sign-in needed':'credentials needed'):mind.online?'connected':'not connected');
+ const via=mind.st.connection?.kind==='openai-compatible'?'OpenAI-compatible API':mind.st.connection?.kind==='invite'?'invited agent':'connected';
+ $('agent-connection-state').textContent=name+' · '+(mind.st.unconfigured?'no API configured':mind.st.authRequired?(mind.st.auth.mode==='oauth'?'sign-in needed':'credentials needed'):mind.st.online?via+(mind.st.connection?.host?' · '+mind.st.connection.host:'')+(mind.st.enabled?'':' · mind off'):'not connected');
  $('agent-connect').textContent=mind.st.auth.mode==='oauth'&&!mind.st.auth.connected?'Sign in to connect':'Connect agent';
- $('agent-disconnect').hidden=!mind.st.enabled&&!(mind.st.auth.mode==='oauth'&&mind.st.auth.connected);
+ $('agent-disconnect').hidden=!mind.st.enabled&&!(mind.st.auth.mode==='oauth'&&mind.st.auth.connected)&&mind.st.connection?.source!=='session';
+ const reply=$('reply-status');if(reply){const elapsed=state.thinking?Math.floor((Date.now()-state.thinking.startedAt)/1000):0;reply.textContent=!mind.st.enabled?'AI is off. Enable AI mind to get replies.':mind.st.unconfigured?'No API configured. Add an OpenAI-compatible API or invite an agent.':mind.st.authRequired?(mind.st.auth.mode==='oauth'?'Sign in to connect your agent.':'Configure credentials in your local agent adapter.'):!mind.st.online?'AI unavailable. Start a configured agent service.':state.thinking?.intercom?(mind.st.phase==='vision'?'Checking the view':'Answering')+' · '+elapsed+'s':state.replyError?state.replyError:state.events.some(e=>e.kind==='intercom')?'Your message is queued.':(state.repliedAt?'Reply received.':'AI ready.');}
+ const bs=$('brain-status');if(bs){bs.textContent=!mind.st.enabled?'MIND OFF':mind.st.online?(mind.st.agentName||'Agent')+(mind.st.vision?' · VISION':' · TEXT ONLY')+(mind.st.lastMs?' · '+(mind.st.lastMs/1000).toFixed(1)+'s':''):'MIND OFFLINE';bs.className=mind.st.enabled&&mind.st.online?'on':'off';}
+}
+mind.refresh().then(()=>paintAgentConnection());
+function hud(){
+ paintAgentConnection();
 
  nerveHud.update(persistence.status);
  const dig=Math.max(0,100-state.despair*.6-state.pain*.3);for(const[k,v]of[['pain',state.pain],['fear',state.fear],['despair',state.despair],['dignity',dig]]){hudEls[k][0].style.width=v+'%';hudEls[k][1].textContent=Math.round(v);}
  $('bpm').textContent=Math.round(state.bpm);$('clock').textContent=hh(state.simMin)+' · '+(state.weather==='rain'?'RAIN':dayPart(state.simMin).toUpperCase());
  const a=state.started?Math.floor(performance.now()/1000-state.airStart):0;$('air').textContent='ON AIR '+String(Math.floor(a/3600)).padStart(2,'0')+':'+String(Math.floor(a/60)%60).padStart(2,'0')+':'+String(a%60).padStart(2,'0');
- const reply=$('reply-status');if(reply){const elapsed=state.thinking?Math.floor((Date.now()-state.thinking.startedAt)/1000):0;reply.textContent=!mind.st.enabled?'AI is off. Enable AI mind to get replies.':mind.st.authRequired?(mind.st.auth.mode==='oauth'?'Sign in to connect your agent.':'Configure credentials in your local agent adapter.'):!mind.st.online?'AI unavailable. Start a configured agent service.':state.thinking?.intercom?(mind.st.phase==='vision'?'Checking the view':'Answering')+' · '+elapsed+'s':state.replyError?state.replyError:state.events.some(e=>e.kind==='intercom')?'Your message is queued.':(state.repliedAt?'Reply received.':'AI ready.');}
- const bs=$('brain-status');bs.textContent=!mind.st.enabled?'MIND OFF':mind.st.online?(mind.st.agentName||'Agent')+(mind.st.vision?' · VISION':' · TEXT ONLY')+(mind.st.lastMs?' · '+(mind.st.lastMs/1000).toFixed(1)+'s':''):'MIND OFFLINE';bs.className=mind.st.enabled&&mind.st.online?'on':'off';
  const me=body.describe();$('status').textContent=`${me.posture} · near ${me.near} · facing ${me.facing} · holding ${me.holding}`;
  if(!audio.voice.speaking)$('dialogue').classList.add('dim');
 }

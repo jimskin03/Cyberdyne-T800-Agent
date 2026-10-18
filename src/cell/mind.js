@@ -129,13 +129,16 @@ export function parseCreation(raw){try{const text=String(raw).replace(/```(?:jso
 export function createMind({enabled=true}={}){
  const rhythm=createThoughtRhythm();
  let lastVision=null;
- const st={online:false,vision:false,enabled,lastMs:0,calls:0,fails:0,inflight:null,loopFeedback:'',loopRepairs:0,lastError:'',phase:'idle',contextChars:0,visionSkipped:false,agentName:'Agent',auth:{mode:'none',connected:false},authRequired:false};
- async function poll(force=false){if(!st.enabled&&!force){st.online=false;return;}try{
+ const st={online:false,vision:false,enabled,lastMs:0,calls:0,fails:0,inflight:null,loopFeedback:'',loopRepairs:0,lastError:'',phase:'idle',contextChars:0,visionSkipped:false,agentName:'Agent',auth:{mode:'none',connected:false},authRequired:false,unconfigured:false,connection:{source:'none',kind:'none',alternative:'',host:''}};
+ async function poll(){try{
   const r=await fetch('/llm/health',{cache:'no-store',signal:AbortSignal.timeout(3000)}),j=await r.json();
+  const pick=(value,allowed)=>allowed.includes(value)?value:'';
   st.agentName=typeof j.agent?.name==='string'&&j.agent.name.trim()?j.agent.name.trim().slice(0,80):'Agent';
   st.auth={mode:['api-key','oauth','none'].includes(j.auth?.mode)?j.auth.mode:'none',connected:j.auth?.connected!==false,...(j.auth?.loginUrl==='/llm/auth/login'?{loginUrl:'/llm/auth/login'}:{})};
-  st.authRequired=j.status==='auth_required'||!st.auth.connected;st.online=j.status==='ok'&&st.auth.connected;st.vision=!!j.vision;st.model=st.agentName;
- }catch{st.online=false;}}
+  const host=typeof j.connection?.host==='string'&&/^(?:\[::1\]|[A-Za-z0-9.-]{1,253})$/.test(j.connection.host)?j.connection.host:'';
+  st.connection={source:pick(j.connection?.source,['env','session','none'])||(j.status==='ok'||j.status==='auth_required'?'env':'none'),kind:pick(j.connection?.kind,['openai-compatible','invite','configured','none'])||'none',alternative:pick(j.connection?.alternative,['api-key','local','sign-in'])||'',host};
+  st.unconfigured=j.status==='unconfigured';st.authRequired=j.status==='auth_required'||st.unconfigured||!st.auth.connected;st.online=j.status==='ok'&&st.auth.connected;st.vision=!!j.vision;st.model=st.agentName;
+ }catch{st.online=false;st.unconfigured=false;}}
  poll();setInterval(poll,4000);
  async function decide(input,signal){
   if(!st.enabled||!st.online)return null;const t0=performance.now();

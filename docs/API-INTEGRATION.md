@@ -26,6 +26,19 @@ Use your service's official current documentation for the API base and model IDs
 
 Run `npm run api` in one terminal and `npm run dev` in another. Open http://127.0.0.1:5340, enable **AI mind** when you intend to make requests, and sign in if requested. The backend listens at `127.0.0.1:18081`. Observations, selected biography, dialogue and optional POV images go to your configured service. Requests use your account's quota or budget. Tests use mocks; no live API or OAuth compatibility is claimed.
 
+A blank API configuration — no base URL, model, key, or OAuth registration — still starts the adapter. It reports `status: "unconfigured"` until you connect from the scene or fill in `.env`.
+
+## Connect from the MIND panel
+
+With the adapter running, the **MIND** section offers two ways to connect without editing `.env`. On a phone, open **Controls** first.
+
+- **OpenAI-compatible API** takes a base URL, API key, text model, and optional vision model. The adapter appends `/chat/completions` (a pasted completions URL is accepted once) and keeps the key in process memory. The browser does not store the key, and health checks never return it.
+- **Invite agent** is for other alternatives: a local or HTTPS server with no key, a different API-key service, or the OAuth account already registered in `.env`. Sign-in does not accept a client-supplied token URL, client secret, or API key. Complete the popup when it opens.
+
+**Disconnect** turns AI off and drops a connection made from the scene. A startup `.env` configuration remains. OAuth tokens are cleared when that session was using sign-in. Restarting the adapter also clears scene connections and OAuth tokens.
+
+Chat requests still cannot choose an upstream URL, model ID, or authorization header. Only `POST /llm/connection` can change the active endpoint, and it uses the same checks as `.env`: HTTPS, or HTTP on loopback, with no credentials or query in the URL, and no loopback URL that points at the adapter itself.
+
 ## OAuth sign-in
 
 OAuth requires a service that supports an application you can register, the required API scopes, authorization-code exchange and PKCE. A consumer sign-in or paid subscription alone does not establish API access. Use the service's official application-registration instructions and register the exact loopback callback URL `http://127.0.0.1:18081/auth/callback`.
@@ -65,11 +78,12 @@ The Vite development server strips `/llm` before forwarding to the local backend
   "agent": {"name": "My Agent"},
   "vision": false,
   "auth": {"mode": "oauth", "connected": false, "loginUrl": "/llm/auth/login"},
+  "connection": {"source": "env", "kind": "configured", "alternative": "sign-in", "host": "inference.example"},
   "upstreamChecked": false
 }
 ```
 
-Once locally configured authentication is available, `status` is `"ok"` and `auth.connected` is true. Modes are `api-key`, `oauth` or `none`. Health does not make a paid upstream request or prove that credentials, model permissions, scopes and quota work. Advertise vision only when configured for image input. Never return credentials or tokens in health.
+Once locally configured authentication is available, `status` is `"ok"` and `auth.connected` is true. Modes are `api-key`, `oauth` or `none`. `connection.source` is `env`, `session`, or `none`. `connection.kind` is `configured`, `openai-compatible`, `invite`, or `none`. Health does not make a paid upstream request or prove that credentials, model permissions, scopes and quota work. Advertise vision only when configured for image input. Never return credentials, tokens, or API keys in health. The host is the endpoint hostname only.
 
 ## Chat request contract
 
@@ -95,7 +109,7 @@ Preserve system, user and assistant roles, including correction turns. Content m
 {"type":"image_url","image_url":{"url":"data:image/jpeg;base64,..."}}
 ```
 
-The backend maps aliases and constructs authorization itself, dropping unsupported service-specific fields such as `effort`. Client JSON must never select an arbitrary upstream URL, model ID or authorization header.
+The backend maps aliases and constructs authorization itself, dropping unsupported service-specific fields such as `effort`. A chat request must not select an upstream URL, model ID, or authorization header. Operator connection uses the separate local `POST /connection` route described above.
 
 Return a nonstreaming envelope with a **string** in `choices[0].message.content`:
 
