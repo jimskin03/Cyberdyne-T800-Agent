@@ -98,6 +98,7 @@ test('cell app owns frame, hidden-tab and persistence scheduling and can tear th
   };
   const ticks = [];
   let saves = 0;
+  let teardownCalls = 0;
   const state = {started: true};
   const app = createCellApp({
     state,
@@ -116,6 +117,7 @@ test('cell app owns frame, hidden-tab and persistence scheduling and can tear th
       return intervals.length;
     },
     clearIntervalFn: (id) => cleared.push(id),
+    teardown: [() => teardownCalls++],
   });
 
   app.start();
@@ -141,4 +143,15 @@ test('cell app owns frame, hidden-tab and persistence scheduling and can tear th
   assert.deepEqual(cleared, [1, 2]);
   assert.ok(cancelledFrames.length);
   assert.equal(listeners.has('pagehide'), false);
+
+  app.start();
+  assert.equal(app.running, true);
+  app.destroy();
+  assert.equal(app.running, false);
+  assert.equal(app.destroyed, true);
+  assert.equal(teardownCalls, 1);
+  app.destroy();
+  app.start();
+  assert.equal(teardownCalls, 1);
+  assert.equal(app.running, false);
 });

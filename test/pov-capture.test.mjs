@@ -33,6 +33,12 @@ test('render failure rejects all current callers and later captures can recover'
  const later=queue.request();queue.flush(()=>'recovered');assert.equal(await later,'recovered');
 });
 
+test('destroying a capture queue rejects every pending observer',async()=>{
+ const queue=createCaptureQueue(),first=queue.request(),second=queue.request();
+ const failures=[assert.rejects(first,{name:'AbortError'}),assert.rejects(second,{name:'AbortError'})];
+ queue.cancelAll();await Promise.all(failures);assert.equal(queue.pending,0);
+});
+
 test('canonical perception projection restores object visibility after narrow inset rendering',()=>{
  const camera=new T.PerspectiveCamera(80,.25,.03,220),point=new T.Vector3(1.5,0,-2),projection=new T.Matrix4(),frustum=new T.Frustum();
  const sees=()=>{camera.updateMatrixWorld(true);projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);frustum.setFromProjectionMatrix(projection);return frustum.containsPoint(point);};

@@ -33,7 +33,7 @@ export function setupPanelDrag(panel){
   panel.classList.remove('panel-positioned');
   panel.style.removeProperty('--panel-x');panel.style.removeProperty('--panel-y');
  }
- heading.addEventListener('pointerdown',event=>{
+ const pointerDown=event=>{
   if(compact.matches||gesture||!event.isPrimary||event.button!==0||event.target.closest('button,select,input,a'))return;
   const rect=panel.getBoundingClientRect();
   const current={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top,active:false};
@@ -43,26 +43,40 @@ export function setupPanelDrag(panel){
    if(gesture!==current)return;
    current.active=true;place(current.left,current.top);panel.classList.add('panel-dragging');
   },350);
- });
- heading.addEventListener('pointermove',event=>{
+ };
+ const pointerMove=event=>{
   if(!gesture||event.pointerId!==gesture.id)return;
   const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
   if(!gesture.active){if(Math.hypot(dx,dy)>6)finish();return;}
   event.preventDefault();place(gesture.left+dx,gesture.top+dy);
- });
- for(const name of ['pointerup','pointercancel','lostpointercapture'])heading.addEventListener(name,finish);
- heading.addEventListener('keydown',event=>{
+ };
+ const keyDown=event=>{
   if(compact.matches||event.target!==heading)return;
   if(event.key==='Home'){event.preventDefault();reset();return;}
   const direction={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[event.key];
   if(!direction)return;
   event.preventDefault();const rect=panel.getBoundingClientRect(),step=event.shiftKey?5:20;
   place(rect.left+direction[0]*step,rect.top+direction[1]*step);
- });
- addEventListener('keydown',event=>{if(event.key==='Escape')finish();});
- addEventListener('blur',finish);
- addEventListener('resize',()=>{finish();if(position&&!compact.matches)place(position.x,position.y);});
- new ResizeObserver(()=>{if(position&&!compact.matches)place(position.x,position.y);}).observe(panel);
+ };
+ const escapeKey=event=>{if(event.key==='Escape')finish();};
+ const resize=()=>{finish();if(position&&!compact.matches)place(position.x,position.y);};
+ const observedResize=()=>{if(position&&!compact.matches)place(position.x,position.y);};
  function syncLayout(){reset();heading.tabIndex=compact.matches?-1:0;}
+
+ heading.addEventListener('pointerdown',pointerDown);
+ heading.addEventListener('pointermove',pointerMove);
+ for(const name of ['pointerup','pointercancel','lostpointercapture'])heading.addEventListener(name,finish);
+ heading.addEventListener('keydown',keyDown);
+ addEventListener('keydown',escapeKey);
+ addEventListener('blur',finish);
+ addEventListener('resize',resize);
+ const resizeObserver=new ResizeObserver(observedResize);resizeObserver.observe(panel);
  compact.addEventListener('change',syncLayout);syncLayout();
+
+ return {destroy(){
+  finish();resizeObserver.disconnect();compact.removeEventListener('change',syncLayout);
+  heading.removeEventListener('pointerdown',pointerDown);heading.removeEventListener('pointermove',pointerMove);
+  for(const name of ['pointerup','pointercancel','lostpointercapture'])heading.removeEventListener(name,finish);
+  heading.removeEventListener('keydown',keyDown);removeEventListener('keydown',escapeKey);removeEventListener('blur',finish);removeEventListener('resize',resize);
+ }};
 }

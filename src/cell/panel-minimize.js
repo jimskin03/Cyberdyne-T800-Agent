@@ -1,6 +1,7 @@
 import './panel-minimize.css';
 
 export function setupPanelMinimize(memory){
+ const cleanups=[];
  const panels=[
   [memory,'JSON Brain','.jb-heading'],
   [document.getElementById('mindpanel'),'Mind Stream','.panel-title'],
@@ -24,7 +25,9 @@ export function setupPanelMinimize(memory){
    button.setAttribute('aria-label',(minimized?'Restore ':'Minimize ')+label);
    button.title=(minimized?'Restore ':'Minimize ')+label;
   }
-  button.addEventListener('click',()=>update(!panel.classList.contains('panel-minimized')));
+  const click=()=>update(!panel.classList.contains('panel-minimized'));
+  button.addEventListener('click',click);cleanups.push(()=>button.removeEventListener('click',click));
   heading.append(button);update(false);
  }
+ return {destroy(){for(const cleanup of cleanups)cleanup();}};
 }

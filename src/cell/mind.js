@@ -27,29 +27,41 @@ import {parseCreation, parseDecision} from './ai/parsers.js';
 
 export {buildMessages, conversationOnly, wantsFreshVision, BUILDER, parseCreation, parseDecision};
 
-export function createMind({enabled = true, client = createLlmClient()} = {}) {
+export function createMind({
+  enabled = true,
+  client = createLlmClient(),
+  setIntervalFn = setInterval,
+  clearIntervalFn = clearInterval,
+} = {}) {
   const rhythm = createThoughtRhythm();
+  const lifecycle = new AbortController();
   let lastVision = null;
   const st = createConnectionState(enabled);
-  const creative = createCreativeGenerator({client, state: st});
+  const creative = createCreativeGenerator({client, state: st, lifecycleSignal: lifecycle.signal});
 
   async function poll() {
     try {
-      applyConnectionHealth(st, await client.health());
+      const health = await client.health({
+        signal: AbortSignal.any([lifecycle.signal, AbortSignal.timeout(3000)]),
+      });
+      if (lifecycle.signal.aborted) return;
+      applyConnectionHealth(st, health);
     } catch {
+      if (lifecycle.signal.aborted) return;
       st.online = false;
       st.unconfigured = false;
     }
   }
 
   poll();
-  setInterval(poll, 4000);
+  const pollTimer = setIntervalFn(poll, 4000);
 
   async function decide(input, signal) {
     if (!st.enabled || !st.online) return null;
     const t0 = performance.now();
     signal = AbortSignal.any([
       ...(signal ? [signal] : []),
+      lifecycle.signal,
       AbortSignal.timeout(input.intercom ? 30000 : 45000),
     ]);
     const job = {};
@@ -247,6 +259,7 @@ export function createMind({enabled = true, client = createLlmClient()} = {}) {
         {
           signal: AbortSignal.any([
             ...(signal ? [signal] : []),
+            lifecycle.signal,
             AbortSignal.timeout(20000),
           ]),
         },
@@ -266,6 +279,14 @@ export function createMind({enabled = true, client = createLlmClient()} = {}) {
     code: creative.code,
     create3D: creative.create3D,
     refresh: () => poll(true),
+    destroy() {
+      if (lifecycle.signal.aborted) return;
+      lifecycle.abort(new DOMException('Mind destroyed.', 'AbortError'));
+      clearIntervalFn(pollTimer);
+      st.online = false;
+      st.inflight = null;
+      st.phase = 'idle';
+    },
     setEnabled(value) {
       st.enabled = value;
       if (value) poll(true);

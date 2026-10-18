@@ -314,10 +314,16 @@ try {
       const current = state.creations.find(
         (c) => c.name.toLowerCase() === String(a.name || '').toLowerCase(),
       );
-      const spec = await mind.create3D({name: a.name, idea: a.idea, current: current?.code});
+      const spec = await mind.create3D({
+        name: a.name,
+        idea: a.idea,
+        current: current?.code,
+        signal: a.token?.signal,
+      });
+      if (a.token?.cancelled || a.token?.signal?.aborted) throw INTERRUPT;
       if (!spec) throw Error('The 3D design did not arrive');
-      const result = await buildCreation(spec.code);
-      if (a.token?.cancelled) throw INTERRUPT;
+      const result = await buildCreation(spec.code, {signal: a.token?.signal});
+      if (a.token?.cancelled || a.token?.signal?.aborted) throw INTERRUPT;
       const id = current?.id || 'creation_' + crypto.randomUUID().replaceAll('-', '');
       if (body.st.holding?.id === id) body.release();
       const item = world.addCreation(
@@ -340,9 +346,12 @@ try {
       return item;
     },
     artist: async (q) => {
-      const image = await world.capture();
+      const signal = q.token?.signal;
+      const image = await world.capture({signal});
+      if (q.token?.cancelled || signal?.aborted) throw INTERRUPT;
       $('doing').textContent = 'planning the drawing (Vision model)…';
-      const art = await mind.draw({...q, image});
+      const art = await mind.draw({...q, image, signal});
+      if (q.token?.cancelled || signal?.aborted) throw INTERRUPT;
       $('doing').textContent = art
         ? `drawing: ${art.title || q.subject} (${art.strokes.length} strokes, Vision model ${((mind.st.artMs || 0) / 1000).toFixed(0)}s)`
         : 'the picture would not come';
@@ -358,7 +367,9 @@ try {
     computer,
     coder: async (q) => {
       $('doing').textContent = `programming ${q.name || 'a new app'} (Vision model)…`;
-      const r = await mind.code(q);
+      const signal = q.token?.signal;
+      const r = await mind.code({...q, signal});
+      if (q.token?.cancelled || signal?.aborted) throw INTERRUPT;
       $('doing').textContent = r
         ? `coded ${r.title || q.name} (${Math.round(r.html.length / 1000)} KB, Vision model ${((mind.st.codeMs || 0) / 1000).toFixed(0)}s)`
         : 'the code would not come';
@@ -1592,6 +1603,13 @@ const app = createCellApp({
   state,
   tick,
   save,
+  teardown: [
+    () => actions.cancelAll(),
+    () => mind.destroy(),
+    () => audio.destroy(),
+    () => world.destroy(),
+    () => window.dispatchEvent?.(new Event('cell:destroy')),
+  ],
 });
 app.start();
 
