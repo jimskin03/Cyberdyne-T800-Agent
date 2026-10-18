@@ -7,6 +7,14 @@ body:not(.feed-started) .json-brain[data-context=cell]{visibility:hidden}
 #mobile-panels,.mobile-panel-heading{display:none}
 .askrow,#ask{min-width:0}
 
+@media(min-width:761px) and (min-height:501px){
+ footer{right:26px;max-height:28px;overflow:auto;line-height:14px}
+ #lab{bottom:52px;max-height:none;overscroll-behavior:contain}
+}
+@media(min-width:761px) and (min-height:501px) and (max-height:820px){
+ #lab{top:350px}
+}
+
 @media(max-width:760px),(max-height:500px){
  header,#monitor,footer,#mindpanel{display:none}
  .topline{top:max(8px,env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));transform:none;max-width:none;flex-wrap:wrap;gap:6px 10px;white-space:normal;padding:8px;z-index:4;letter-spacing:0}

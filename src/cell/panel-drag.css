@@ -1,0 +1,7 @@
+@media(min-width:761px) and (min-height:501px){
+ .panel-drag-handle{cursor:grab;touch-action:none;user-select:none;min-height:28px}
+ .panel-drag-handle:focus-visible{outline:2px solid var(--cy);outline-offset:4px}
+ .json-brain.panel-positioned{left:var(--panel-x);top:var(--panel-y);right:auto;bottom:auto;transform:none;max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain}
+ .json-brain[data-context=cell].panel-positioned{left:var(--panel-x)}
+ .panel-dragging .panel-drag-handle{cursor:grabbing}
+}

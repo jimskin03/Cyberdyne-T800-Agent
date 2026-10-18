@@ -2,7 +2,6 @@ import './panel-minimize.css';
 
 export function setupPanelMinimize(memory){
  const panels=[
-  [document.getElementById('monitor'),'Unit Monitor','.panel-title'],
   [memory,'JSON Brain','.jb-heading'],
   [document.getElementById('mindpanel'),'Mind Stream','.panel-title'],
   [document.getElementById('bottom'),'Conversation',null],
