@@ -1,0 +1,14 @@
+# Authored and generated data
+src/cell/default-brain.json
+public/
+dist/
+
+# Keep long model prompts and renderer/shader strings untouched until their own extractions.
+src/cell/mind.js
+src/cell/sensor-contract.js
+src/cell/world.js
+
+# Generated outputs
+node_modules/
+test-results/
+playwright-report/
