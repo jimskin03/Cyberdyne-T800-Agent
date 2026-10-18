@@ -65,7 +65,7 @@ test('creative generation inherits lifecycle cancellation even without an action
   await nextTurn();
   assert.equal(requestSignal.aborted, false);
   lifecycle.abort();
-  assert.equal(await pending, null);
+  await assert.rejects(pending, {name: 'AbortError'});
   assert.equal(requestSignal.aborted, true);
 });
 

@@ -36,3 +36,35 @@ test('action result statuses are closed and unknown actions are truthful',async(
  assert.equal(missing.status,'unavailable');
  assert.match(missing.text,/don't know where/);
 });
+
+test('dispatcher reports snapshot target, 3D build and browser failures with explicit status',async()=>{
+ const world={items:{},features:{},bot:{head:new T.Object3D()},scene:new T.Scene()};
+ const body={st:{x:0,z:0,heading:0,posture:'sit'},handPos:()=>new T.Vector3(),freeSpotNear:(x,z)=>[x,z],stop(){},clearGesture(){},gesture(){}};
+ const actions=createActions(world,body,{
+   planning(){},
+   creator:async()=>{throw Error('broken builder');},
+   browser:async()=>({error:'browser blocked'}),
+ });
+ body.st.seat=actions.SEATS.stool;
+ const token={cancelled:false,signal:new AbortController().signal};
+ const missing=await actions.runResult({do:'snapshot',target:'nonexistent-object'},token);
+ assert.equal(missing.status,'unavailable');
+ const build=await actions.runResult({do:'create_3d',name:'test item'},token);
+ assert.equal(build.status,'failed');
+ assert.match(build.text,/broken builder/);
+ const browser=await actions.runResult({do:'browser'},token);
+ assert.equal(browser.status,'failed');
+});
+
+test('3D cancellation is never reported as a successful build',async()=>{
+ const world={items:{},features:{},bot:{head:new T.Object3D()},scene:new T.Scene()};
+ const body={st:{x:0,z:0,heading:0,posture:'sit'},handPos:()=>new T.Vector3(),freeSpotNear:(x,z)=>[x,z],stop(){},clearGesture(){},gesture(){}};
+ const controller=new AbortController(),token={cancelled:false,signal:controller.signal};
+ const actions=createActions(world,body,{
+  planning(){},
+  creator:async()=>{controller.abort();throw Error('creative response missing');},
+ });
+ body.st.seat=actions.SEATS.stool;
+ const result=await actions.runResult({do:'create_3d',name:'cancelled'},token);
+ assert.equal(result.status,'cancelled');
+});

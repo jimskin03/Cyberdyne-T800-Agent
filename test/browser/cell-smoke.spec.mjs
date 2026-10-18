@@ -20,6 +20,7 @@ async function openFresh(page,request,{width=1440,height=900}={}){
 }
 
 async function startFeed(page){
+  await expect(page.locator('#go')).toBeVisible({timeout:20_000});
   await page.locator('#go').click({force:true});
   await expect.poll(()=>page.evaluate(()=>window.__CELL.state.started)).toBe(true);
 }
@@ -29,7 +30,8 @@ async function connectMockAgent(page){
   await page.locator('#invite-name').fill('Mock T-800');
   await page.locator('#invite-base').fill('http://127.0.0.1:9999/v1');
   await page.locator('#invite-model').fill('mock-model');
-  await page.getByRole('button',{name:'Invite',exact:true}).click();
+  // Submit from the model field; accessible button names can be transient during HUD repaint.
+  await page.locator('#invite-model').press('Enter');
   await expect(page.locator('#agent-connection-state')).toContainText('Mock T-800');
   await expect(page.locator('#use-brain')).toBeChecked();
 }
@@ -96,14 +98,14 @@ test('reset keeps one compatible undo slot and restores namespaced state',async(
   await openFresh(page,request);
   await page.evaluate(()=>localStorage.setItem('cell-public-test.marker','kept-for-undo'));
   await startFeed(page);
-  await page.locator('#forget').click();
+  await Promise.all([page.waitForEvent('framenavigated'),page.locator('#forget').click()]);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(()=>window.__CELL?.world);
   expect(await page.evaluate(()=>localStorage.getItem('cell-public-test.marker'))).toBeNull();
   expect(await page.evaluate(()=>localStorage.getItem('cell-session-reset-backup.v1'))).not.toBeNull();
 
   await startFeed(page);
-  await page.getByRole('button',{name:'Restore previous session'}).click();
+  await Promise.all([page.waitForEvent('framenavigated'),page.getByRole('button',{name:'Restore previous session'}).click()]);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(()=>window.__CELL?.world);
   expect(await page.evaluate(()=>localStorage.getItem('cell-public-test.marker'))).toBe('kept-for-undo');
