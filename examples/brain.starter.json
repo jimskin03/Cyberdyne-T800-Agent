@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "id": "fictional-radio-maker-v1",
+  "source": "simulated biography",
+  "person": "A fictional radio maker",
+  "age": 30,
+  "nodes": [
+    {
+      "id": "m-family-story",
+      "age": [0, 3],
+      "kind": "learned",
+      "fact": "A family story says I liked listening to the workshop radio as a child.",
+      "strength": 0.4,
+      "feeling": "A faint sense of familiarity, learned from stories.",
+      "fragments": [],
+      "domain": "family",
+      "effects": {"trust": 0.1}
+    },
+    {
+      "id": "m-radio-repair",
+      "age": [12, 12],
+      "kind": "episode",
+      "fact": "I repaired a fictional workshop radio with patient help from a teacher.",
+      "strength": 0.8,
+      "feeling": "Relief and pride after asking for help.",
+      "fragments": ["A loose wire", "The first clear station"],
+      "domain": "making",
+      "effects": {"agency": 0.5, "trust": 0.3, "openness": 0.2}
+    },
+    {
+      "id": "m-quiet-routine",
+      "age": [24, 30],
+      "kind": "routine",
+      "fact": "I often settled after a difficult day by sketching a small practical project.",
+      "strength": 0.65,
+      "feeling": "Calmer when a problem became a few manageable steps.",
+      "fragments": ["A pencil sketch"],
+      "domain": "routine",
+      "effects": {"agency": 0.2}
+    }
+  ],
+  "pathways": [
+    {"id": "path-making", "label": "Learning to repair", "cues": ["radio", "repair", "teacher", "help", "workshop"], "route": ["m-family-story", "m-radio-repair"]},
+    {"id": "path-rest", "label": "Quiet practical recovery", "cues": ["rest", "calm", "sketch", "overwhelmed", "project"], "route": ["m-quiet-routine"]}
+  ],
+  "links": [["path-making", "path-rest", 0.7]]
+}

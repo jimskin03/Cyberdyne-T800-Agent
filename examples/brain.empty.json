@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "id": "cell-public-demo-v1",
+  "source": "simulated biography",
+  "person": "Fictional containment unit",
+  "age": 30,
+  "nodes": [],
+  "pathways": [],
+  "links": []
+}

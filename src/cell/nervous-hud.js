@@ -1,0 +1,9 @@
+export function createNervousHud(nervous,cognitive){
+ const panel=document.createElement('details');panel.id='nervous-panel';panel.open=true;panel.innerHTML='<summary>BODY RECEPTORS &amp; MEMORY</summary><div class="nerve-legend">slight · mild · moderate · severe · overwhelming</div><div id="nerve-mental"></div><progress id="nerve-insanity" max="100" value="0" aria-label="Insanity"></progress><div id="nerve-perception"></div><div id="nerve-rows"></div><div id="nerve-storage"></div>';
+ document.getElementById('lab').prepend(panel);
+ const rows=new Map();for(const r of nervous.rows()){const el=document.createElement('div');el.className='nerve-row';const label=document.createElement('span'),meter=document.createElement('progress'),detail=document.createElement('small');meter.max=100;meter.setAttribute('aria-label',r.name+' recovery');el.append(label,meter,detail);panel.querySelector('#nerve-rows').append(el);rows.set(r.id,{el,label,meter,detail});}
+ function update(storage){const c=cognitive.snapshot();panel.querySelector('#nerve-mental').textContent=`Insanity ${c.insanity.toFixed(1)} / 100 · Isolation ${(c.isolationSeconds/60).toFixed(1)} min`;panel.querySelector('#nerve-insanity').value=c.insanity;panel.querySelector('#nerve-perception').textContent=c.perception||'No active perceptual disturbance.';
+  for(const r of nervous.rows()){const e=rows.get(r.id);e.label.textContent=`${r.name} — ${r.level} · ${r.temperature.toFixed(1)} °C`;e.meter.value=r.recovery;e.detail.textContent=r.injury>=.5?`${r.healing?'Healing':'Recovery slowed'} · ${r.recovery.toFixed(1)}% recovered${r.painfulSteps?' · steps hurt':''}`:'No lingering injury';e.el.dataset.level=r.level;}
+  panel.querySelector('#nerve-storage').textContent=storage?.error?'Memory save: '+storage.error:storage?.savedAt?'Memory saved '+new Date(storage.savedAt).toLocaleTimeString():'Memory awaiting first save';
+ }return {update};
+}

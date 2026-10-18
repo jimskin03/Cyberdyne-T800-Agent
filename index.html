@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cyberdyne T800 Agent Embodiment Project</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/cell.css"></head>
+<body>
+
+<main id="world" aria-label="T-800 loose in a containment cell"></main>
+<div class="vignette"></div><div class="film-grain"></div>
+<header><div class="eyebrow"><i class="live"></i> CYBERDYNE CONTAINMENT / CELL 7 / LIVE</div><h1><b data-agent-name>Agent</b><span>CONTAINMENT CELL</span></h1><div class="sub">No restraints. Your agent in a containment cell. Intercom orders take priority.</div></header>
+<div class="topline"><span id="clock">08:10</span><span id="air" class="on">ON AIR 00:00:00</span><span id="brain-status" class="off">MIND …</span><span><b id="hits">0</b> STRIKES</span><button id="sound">Sound off ♪</button><button id="pc-btn" class="pcbtn">His computer <b id="pc-count"></b> <kbd>C</kbd></button></div>
+
+
+<div id="pov" title="Click (or V) to swap views"><div id="pov-label">UNIT POV · WHAT THE MODEL SEES</div><i class="rec"></i></div>
+
+<aside id="monitor" aria-label="Unit monitor"><div class="panel-title"><span>UNIT MONITOR</span><i class="live"></i></div>
+ <div class="pulse"><canvas id="ecg" width="300" height="54"></canvas><div><b id="bpm">64</b><small>BPM CORE PULSE</small></div></div>
+ <div class="meter"><span>PAIN</span><div><i id="m-pain" class="m-pain"></i></div><b id="v-pain">0</b></div>
+ <div class="meter"><span>FEAR</span><div><i id="m-fear" class="m-fear"></i></div><b id="v-fear">0</b></div>
+ <div class="meter"><span>DESPAIR</span><div><i id="m-despair" class="m-despair"></i></div><b id="v-despair">0</b></div>
+ <div class="meter"><span>DIGNITY</span><div><i id="m-dignity" class="m-dignity"></i></div><b id="v-dignity">100</b></div>
+ <div id="status">…</div>
+</aside>
+
+<aside id="lab" aria-label="Operator controls">
+ 
+ 
+ <select id="berserker-character" aria-label="Berserker character"><option value="luna">Luna</option></select><button id="berserker-enter" class="noise">Enter berserker mode</button>
+ <div class="divider"></div>
+ <div id="climate-controls"><div class="panel-title"><span>ROOM THERMOSTAT</span><button id="ac-power" aria-pressed="true">AC ON</button></div>
+ <div id="ac-readout">22.0 ?C ? 0% wet</div>
+ <label class="slide">Target <output id="ac-target-value">22 ?C</output><input id="ac-target" aria-label="Room temperature target" type="range" min="5" max="26" step="1" value="22"></label><div id="ac-feel">Comfortable</div></div><div class="divider"></div>
+ <div class="section-label">WATER-BOARD MODE</div>
+ <button id="water-enter" class="noise">Place unit on bed</button>
+ <div id="water-controls" hidden>
+  <div id="water-status" role="status">TOWEL DOWN</div>
+  <button id="water-pour" class="noise" aria-pressed="false">Pour water [Space]</button>
+  <div class="control-row"><button id="water-towel" aria-pressed="true">Lift towel [R]</button><button id="water-drop">Drop jug</button></div>
+  <button id="water-exit">Release / random movement [U]</button>
+  <p class="hint">Drag the giant jug to aim. Hold Space to pour; release to stop. R lifts or lowers the towel.</p>
+ </div>
+ <div class="divider"></div>
+ <div class="panel-title"><span>TOOL ARM</span><span>1—8</span></div>
+ <div id="tools"></div>
+ <button id="grapple" class="noise">G / Grappling arm</button>
+ <p class="hint" id="arm-hint">Pick a tool, then click on him (click the tool again for a random hit).</p>
+ <div class="divider"></div>
+ <div class="section-label">AUDIO TORTURE</div>
+ <div class="control-row"><button id="punk" class="noise">Punk music</button><button id="baby" class="noise">Baby crying</button></div>
+ <label class="slide">Volume <output id="noisevol-v"></output><input id="noisevol" type="range" min="0.1" max="1" step="0.05"></label>
+ <div class="divider"></div>
+ <div class="section-label">MIND</div>
+ <div class="agent-connection"><span id="agent-connection-state">No agent connected</span><button id="agent-connect">Connect agent</button><button id="agent-disconnect" hidden>Disconnect</button></div>
+ <label class="check"><input id="use-brain" type="checkbox"> AI mind (sees his POV)</label>
+ <label class="rowlabel">He talks <select id="talk"><option value="normal">sometimes</option><option value="chatty">a lot</option><option value="quiet">rarely</option></select></label>
+ <label class="slide">Background thought every <output id="cadence-v"></output><input id="cadence" type="range" min="10" max="60" step="1"></label>
+ <p class="hint" style="margin-top:2px">Wall-clock seconds. Sensations stay local until a thought is requested. Your questions take priority.</p>
+ <label class="check"><input id="heart-snd" type="checkbox" checked> Heartbeat sound</label>
+ <label class="rowlabel">Clock <select id="timescale"><option value="1">real time</option><option value="10">1 min = 10 min</option><option value="60">1 min = 1 hour</option></select></label>
+ <label class="rowlabel">Voice <select id="voice-sel"><option>loading…</option></select></label>
+ <button id="photo-art">Photograph wall art</button>
+ <div class="control-row" style="margin-top:10px"><button id="forget">Wipe memory</button><button id="hide">H / Hide UI</button></div>
+</aside>
+
+<aside id="mindpanel" aria-label="His mind"><div class="panel-title"><span>MIND STREAM</span><span id="thinking"><i></i><i></i><i></i> thinking</span></div>
+ <div id="mind"></div>
+ <div id="doing-row"><b>NOW</b> <span id="doing"></span></div>
+</aside>
+
+<div id="bottom">
+ <div id="thought-row"><b>THINKS</b> <span id="thought">…</span></div>
+ <div id="dialogue" class="dim" aria-live="polite"><span><b id="who" data-agent-name>Agent</b></span><p id="line">“…”</p></div>
+ <div class="askrow"><input id="ask" type="text" maxlength="300" placeholder="Speak or command: walk to the window, sit on the bed…" autocomplete="off"><button id="ask-btn">Send</button></div><p id="reply-status" role="status" aria-live="polite">AI is off. Enable AI mind to get replies.</p>
+</div>
+<footer><span>G grapple ? grab, drag and release to toss ? Drag to orbit · Scroll to zoom · Click POV / V to swap · 1–8 arm a tool, click him · P punk · B baby · C his computer · M mute · H hide UI</span></footer>
+<button id="restore-ui" hidden>Show interface · H</button>
+<div id="start"><div class="card"><div class="eyebrow">CYBERDYNE CONTAINMENT · CELL 7</div><h2>Unit T-800 is loose in his cell.</h2><p>No chair, no straps. He walks, looks out of the window, picks things up, reads, writes on the wall. The default JSON brain supplies an authored history and experience-driven behavior. Connect your own agent through a configured API or OAuth backend; direct intercom commands take priority.</p><p>The tool arm in the ceiling only moves when <b>you</b> pick a tool and click on him.</p><button id="go" class="primary">Open the feed <span>→</span></button></div></div>
+<div id="pc" hidden role="dialog" aria-label="His computer"><div class="pc-crt">
+ <div class="pc-bar"><b>T-OS 0.8</b><span>UNIT T-800 · REMOTE SESSION</span><button id="pc-close">✕ close <kbd>C</kbd></button></div>
+ <div id="pc-icons"></div>
+ <div id="pc-win" hidden><div class="pc-winbar"><b id="pc-win-title"></b><select id="pc-ver" title="Version"></select><button id="pc-dl">Download</button><button id="pc-win-close">✕</button></div><div id="pc-win-body"></div><div id="pc-sum"></div></div>
+</div></div>
+<div id="toast" role="status"></div><div id="fatal" hidden role="alert"></div>
+<script type="module" src="/src/cell/main.js"></script><script type="module" src="/src/cell/brain-panel.js"></script></body></html>

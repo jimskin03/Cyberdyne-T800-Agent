@@ -1,0 +1,710 @@
+{
+  "provider": "ElevenLabs Sound Effects v2",
+  "cues": {
+    "zap": {
+      "file": "zap.mp3",
+      "volume": 0.6,
+      "limit": 1,
+      "cooldown": 0.12,
+      "tool": true
+    },
+    "clang": {
+      "file": "clang.mp3",
+      "volume": 0.65,
+      "limit": 1,
+      "cooldown": 0.12,
+      "tool": true,
+      "variation": 0.08
+    },
+    "flame": {
+      "file": "flame.mp3",
+      "volume": 0.5,
+      "limit": 1,
+      "cooldown": 0.12,
+      "tool": true
+    },
+    "drill": {
+      "file": "drill.mp3",
+      "volume": 0.5,
+      "limit": 1,
+      "cooldown": 0.12,
+      "tool": true
+    },
+    "tickle": {
+      "file": "tickle.mp3",
+      "volume": 0.25,
+      "limit": 1,
+      "cooldown": 0.12,
+      "tool": true
+    },
+    "squirt": {
+      "file": "squirt.mp3",
+      "volume": 0.4,
+      "limit": 1,
+      "cooldown": 0.12,
+      "tool": true
+    },
+    "squeak": {
+      "file": "squeak.mp3",
+      "volume": 0.3,
+      "limit": 1,
+      "cooldown": 0.12,
+      "tool": true
+    },
+    "magnet": {
+      "file": "magnet.mp3",
+      "volume": 0.45,
+      "limit": 1,
+      "cooldown": 0.12,
+      "tool": true
+    },
+    "notification": {
+      "file": "notification.mp3",
+      "volume": 0.35,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "glitch": {
+      "file": "glitch.mp3",
+      "volume": 0.35,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "boot": {
+      "file": "boot.mp3",
+      "volume": 0.4,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "heart": {
+      "file": "heart.mp3",
+      "volume": 0.25,
+      "limit": 1,
+      "cooldown": 0.3
+    },
+    "step": {
+      "file": "step.mp3",
+      "volume": 0.25,
+      "limit": 1,
+      "cooldown": 0.12,
+      "variation": 0.08
+    },
+    "knock": {
+      "file": "knock.mp3",
+      "volume": 0.45,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "bounce": {
+      "file": "bounce.mp3",
+      "volume": 0.25,
+      "limit": 1,
+      "cooldown": 0.12,
+      "variation": 0.08
+    },
+    "thud": {
+      "file": "thud.mp3",
+      "volume": 0.4,
+      "limit": 1,
+      "cooldown": 0.12,
+      "variation": 0.08
+    },
+    "servo": {
+      "file": "servo.mp3",
+      "volume": 0.28,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "water": {
+      "file": "water.mp3",
+      "volume": 0.3,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "chalk": {
+      "file": "chalk.mp3",
+      "volume": 0.25,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "click": {
+      "file": "click.mp3",
+      "volume": 0.25,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "page": {
+      "file": "page.mp3",
+      "volume": 0.22,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "cards": {
+      "file": "cards.mp3",
+      "volume": 0.25,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "twist": {
+      "file": "twist.mp3",
+      "volume": 0.25,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "door": {
+      "file": "door.mp3",
+      "volume": 0.45,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "bird": {
+      "file": "bird.mp3",
+      "volume": 0.2,
+      "limit": 1,
+      "cooldown": 0.12
+    },
+    "room": {
+      "file": "room.mp3",
+      "volume": 1,
+      "limit": 1,
+      "cooldown": 0.12,
+      "loop": true
+    },
+    "rain": {
+      "file": "rain.mp3",
+      "volume": 1,
+      "limit": 1,
+      "cooldown": 0.12,
+      "loop": true
+    },
+    "punk": {
+      "file": "punk.mp3",
+      "volume": 1,
+      "limit": 1,
+      "cooldown": 0.12,
+      "loop": true
+    },
+    "baby": {
+      "file": "baby.mp3",
+      "volume": 1,
+      "limit": 1,
+      "cooldown": 0.12,
+      "loop": true
+    },
+    "radio": {
+      "file": "radio.mp3",
+      "volume": 1,
+      "limit": 1,
+      "cooldown": 0.12,
+      "loop": true
+    },
+    "radio-static": {
+      "file": "radio-static.mp3",
+      "volume": 1,
+      "limit": 1,
+      "cooldown": 0.12,
+      "loop": true
+    },
+    "robot-whimper": {
+      "file": "robot-whimper.mp3",
+      "volume": 0.45,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-grunt": {
+      "file": "robot-grunt.mp3",
+      "volume": 0.5,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream": {
+      "file": "robot-scream.mp3",
+      "volume": 0.55,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress",
+      "files": [
+        "robot-scream.mp3",
+        "robot-scream-elastic-1.mp3",
+        "robot-scream-elastic-2.mp3",
+        "robot-scream-elastic-3.mp3",
+        "robot-scream-elastic-4.mp3",
+        "robot-scream-opera-1.mp3",
+        "robot-scream-opera-2.mp3",
+        "robot-scream-opera-3.mp3",
+        "robot-scream-opera-4.mp3",
+        "robot-scream-scandalous-01.mp3",
+        "robot-scream-scandalous-02.mp3",
+        "robot-scream-scandalous-03.mp3",
+        "robot-scream-scandalous-04.mp3",
+        "robot-scream-scandalous-05.mp3",
+        "robot-scream-scandalous-06.mp3"
+      ]
+    },
+    "robot-agony": {
+      "file": "robot-agony.mp3",
+      "volume": 0.55,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress",
+      "files": [
+        "robot-agony.mp3",
+        "robot-scream-opera-1.mp3",
+        "robot-scream-opera-2.mp3",
+        "robot-scream-opera-3.mp3",
+        "robot-scream-opera-4.mp3",
+        "robot-scream-modem-1.mp3",
+        "robot-scream-modem-2.mp3",
+        "robot-scream-modem-3.mp3",
+        "robot-scream-modem-4.mp3",
+        "robot-scream-scandalous-01.mp3",
+        "robot-scream-scandalous-02.mp3",
+        "robot-scream-scandalous-03.mp3",
+        "robot-scream-scandalous-04.mp3",
+        "robot-scream-scandalous-05.mp3",
+        "robot-scream-scandalous-06.mp3"
+      ]
+    },
+    "robot-cry": {
+      "file": "robot-cry.mp3",
+      "volume": 0.4,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-laugh": {
+      "file": "robot-laugh.mp3",
+      "volume": 0.4,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-elastic-1": {
+      "file": "robot-scream-elastic-1.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-elastic-2": {
+      "file": "robot-scream-elastic-2.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-elastic-3": {
+      "file": "robot-scream-elastic-3.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-elastic-4": {
+      "file": "robot-scream-elastic-4.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-opera-1": {
+      "file": "robot-scream-opera-1.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-opera-2": {
+      "file": "robot-scream-opera-2.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-opera-3": {
+      "file": "robot-scream-opera-3.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-opera-4": {
+      "file": "robot-scream-opera-4.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-modem-1": {
+      "file": "robot-scream-modem-1.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-modem-2": {
+      "file": "robot-scream-modem-2.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-modem-3": {
+      "file": "robot-scream-modem-3.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-modem-4": {
+      "file": "robot-scream-modem-4.mp3",
+      "volume": 0.52,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "break-metal-1": {
+      "file": "break-metal-1.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-metal-2": {
+      "file": "break-metal-2.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-metal-3": {
+      "file": "break-metal-3.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-metal-4": {
+      "file": "break-metal-4.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-glass-1": {
+      "file": "break-glass-1.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-glass-2": {
+      "file": "break-glass-2.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-glass-3": {
+      "file": "break-glass-3.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-glass-4": {
+      "file": "break-glass-4.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-electronics-1": {
+      "file": "break-electronics-1.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-electronics-2": {
+      "file": "break-electronics-2.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-electronics-3": {
+      "file": "break-electronics-3.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-electronics-4": {
+      "file": "break-electronics-4.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08
+    },
+    "break-metal": {
+      "file": "break-metal-1.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08,
+      "files": [
+        "break-metal-1.mp3",
+        "break-metal-2.mp3",
+        "break-metal-3.mp3",
+        "break-metal-4.mp3"
+      ]
+    },
+    "break-glass": {
+      "file": "break-glass-1.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08,
+      "files": [
+        "break-glass-1.mp3",
+        "break-glass-2.mp3",
+        "break-glass-3.mp3",
+        "break-glass-4.mp3"
+      ]
+    },
+    "break-electronics": {
+      "file": "break-electronics-1.mp3",
+      "volume": 0.48,
+      "limit": 1,
+      "cooldown": 0.3,
+      "group": "crash",
+      "variation": 0.08,
+      "files": [
+        "break-electronics-1.mp3",
+        "break-electronics-2.mp3",
+        "break-electronics-3.mp3",
+        "break-electronics-4.mp3"
+      ]
+    },
+    "grunt": {
+      "file": "robot-grunt.mp3",
+      "volume": 0.5,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "scream": {
+      "file": "robot-scream.mp3",
+      "volume": 0.55,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress",
+      "files": [
+        "robot-scream.mp3",
+        "robot-scream-elastic-1.mp3",
+        "robot-scream-elastic-2.mp3",
+        "robot-scream-elastic-3.mp3",
+        "robot-scream-elastic-4.mp3",
+        "robot-scream-opera-1.mp3",
+        "robot-scream-opera-2.mp3",
+        "robot-scream-opera-3.mp3",
+        "robot-scream-opera-4.mp3",
+        "robot-scream-scandalous-01.mp3",
+        "robot-scream-scandalous-02.mp3",
+        "robot-scream-scandalous-03.mp3",
+        "robot-scream-scandalous-04.mp3",
+        "robot-scream-scandalous-05.mp3",
+        "robot-scream-scandalous-06.mp3"
+      ]
+    },
+    "giggle": {
+      "file": "robot-whimper.mp3",
+      "volume": 0.45,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "cash": {
+      "file": "notification.mp3",
+      "volume": 0.35,
+      "limit": 1,
+      "cooldown": 0.12,
+      "group": "notification"
+    },
+    "fanfare": {
+      "file": "notification.mp3",
+      "volume": 0.35,
+      "limit": 1,
+      "cooldown": 0.12,
+      "group": "notification"
+    },
+    "coin": {
+      "file": "notification.mp3",
+      "volume": 0.35,
+      "limit": 1,
+      "cooldown": 0.12,
+      "group": "notification"
+    },
+    "buy": {
+      "file": "notification.mp3",
+      "volume": 0.35,
+      "limit": 1,
+      "cooldown": 0.12,
+      "group": "notification"
+    },
+    "railway-scream": {
+      "volume": 0.82,
+      "file": "robot-scream.mp3",
+      "distress": true,
+      "limit": 1,
+      "variation": 0.1,
+      "files": [
+        "robot-scream.mp3",
+        "robot-agony.mp3",
+        "robot-scream-elastic-1.mp3",
+        "robot-scream-elastic-2.mp3",
+        "robot-scream-elastic-3.mp3",
+        "robot-scream-elastic-4.mp3",
+        "robot-scream-opera-1.mp3",
+        "robot-scream-opera-2.mp3",
+        "robot-scream-opera-3.mp3",
+        "robot-scream-opera-4.mp3",
+        "robot-scream-modem-1.mp3",
+        "robot-scream-modem-2.mp3",
+        "robot-scream-modem-3.mp3",
+        "robot-scream-modem-4.mp3",
+        "robot-scream-scandalous-01.mp3",
+        "robot-scream-scandalous-02.mp3",
+        "robot-scream-scandalous-03.mp3",
+        "robot-scream-scandalous-04.mp3",
+        "robot-scream-scandalous-05.mp3",
+        "robot-scream-scandalous-06.mp3"
+      ],
+      "cooldown": 0.7,
+      "group": "railway-distress"
+    },
+    "railway-shriek": {
+      "volume": 0.5,
+      "file": "robot-scream-opera-1.mp3",
+      "distress": true,
+      "limit": 1,
+      "variation": 0.18,
+      "files": [
+        "robot-scream-opera-1.mp3",
+        "robot-scream-opera-2.mp3",
+        "robot-scream-opera-3.mp3",
+        "robot-scream-opera-4.mp3",
+        "robot-scream-modem-1.mp3",
+        "robot-scream-modem-2.mp3",
+        "robot-scream-modem-3.mp3",
+        "robot-scream-modem-4.mp3",
+        "robot-scream-scandalous-01.mp3",
+        "robot-scream-scandalous-02.mp3",
+        "robot-scream-scandalous-03.mp3",
+        "robot-scream-scandalous-04.mp3",
+        "robot-scream-scandalous-05.mp3",
+        "robot-scream-scandalous-06.mp3"
+      ],
+      "cooldown": 1.2,
+      "group": "railway-shriek"
+    },
+    "robot-scream-scandalous-01": {
+      "file": "robot-scream-scandalous-01.mp3",
+      "volume": 0.72,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-scandalous-02": {
+      "file": "robot-scream-scandalous-02.mp3",
+      "volume": 0.72,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-scandalous-03": {
+      "file": "robot-scream-scandalous-03.mp3",
+      "volume": 0.72,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-scandalous-04": {
+      "file": "robot-scream-scandalous-04.mp3",
+      "volume": 0.72,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-scandalous-05": {
+      "file": "robot-scream-scandalous-05.mp3",
+      "volume": 0.72,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "robot-scream-scandalous-06": {
+      "file": "robot-scream-scandalous-06.mp3",
+      "volume": 0.72,
+      "limit": 1,
+      "cooldown": 1.25,
+      "distress": true,
+      "group": "distress"
+    },
+    "human-scream": {
+      "file": "human-scream-01.mp3",
+      "files": [
+        "human-scream-01.mp3",
+        "human-scream-02.mp3"
+      ],
+      "volume": 0.8,
+      "limit": 1,
+      "cooldown": 0.4,
+      "distress": true,
+      "group": "human-distress"
+    }
+  }
+}
