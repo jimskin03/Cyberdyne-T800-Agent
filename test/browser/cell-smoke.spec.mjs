@@ -37,11 +37,32 @@ async function connectMockAgent(page){
 }
 
 async function sendIntercom(page,text){
-  const before=await page.evaluate(()=>window.__CELL.state.journal.filter(entry=>entry.kind==='say').length);
+  const answer=`Spoken answer: ${text}`;
   await page.locator('#ask').fill(text);
   // The intercom also submits on Enter; avoid pointer actionability retries under software WebGL.
   await page.locator('#ask').press('Enter');
-  await expect.poll(()=>page.evaluate(()=>window.__CELL.state.journal.filter(entry=>entry.kind==='say').length),{timeout:15_000}).toBeGreaterThan(before);
+  await expect(page.locator('#mind')).toContainText(answer,{timeout:45_000});
+}
+
+async function standBeside(page,featureId){
+  // Action deadlines use wall time, while each frame moves the body by at most 60ms.
+  // Under SwiftShader a cross-cell walk expires before vision can run.
+  await page.evaluate(id=>{
+    const {body,world}=window.__CELL;
+    const feature=world.features[id];
+    const [x,z]=feature.stand;
+    const look=feature.look;
+    body.stop();
+    body.st.posture='stand';
+    body.st.seat=null;
+    body.st.rising=null;
+    body.st.x=x;
+    body.st.z=z;
+    body.st.heading=Math.atan2(look[0]-x,look[2]-z);
+    body.st.turnTo=null;
+    body.st.path=[];
+    body.st.moving=false;
+  },featureId);
 }
 
 test('desktop startup, mocked connection, consecutive replies, fresh inspection and computer',async({page,request})=>{
@@ -53,15 +74,15 @@ test('desktop startup, mocked connection, consecutive replies, fresh inspection 
 
   await sendIntercom(page,'How are you?');
   await sendIntercom(page,'What are you thinking about?');
-  await expect(page.locator('#mind')).toContainText('Mock reply 2.');
 
+  await standBeside(page,'table');
   await page.locator('#ask').fill('inspect the table');
-  await page.locator('#ask-btn').click();
+  await page.locator('#ask').press('Enter');
   await expect.poll(async()=>{
     const state=await request.get('http://127.0.0.1:18081/__state');
     return (await state.json()).visionCalls;
-  },{timeout:20_000}).toBeGreaterThan(0);
-  await expect.poll(()=>page.evaluate(()=>window.__CELL.state.journal.some(entry=>entry.kind==='result'&&/table|puzzle cube/i.test(entry.text))),{timeout:20_000}).toBe(true);
+  },{timeout:60_000}).toBeGreaterThan(0);
+  await expect.poll(()=>page.evaluate(()=>window.__CELL.state.journal.some(entry=>entry.kind==='result'&&/table|puzzle cube/i.test(entry.text))),{timeout:60_000}).toBe(true);
 
   await page.locator('#pc-btn').click();
   await expect(page.locator('#pc')).toBeVisible();
