@@ -13,6 +13,8 @@ saved-world/
 creations/
 output/
 verification/
+test-results/
+playwright-report/
 models/
 *.previous
 *.next
