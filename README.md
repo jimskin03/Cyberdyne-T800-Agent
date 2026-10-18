@@ -25,6 +25,22 @@ npm run privacy:check
 
 The privacy check requires Git and scans tracked and untracked publication candidates, respecting `.gitignore`. It reports file names and line numbers without printing matched secrets. A clean scan does not establish that all possible personal information has been found.
 
+## Included brain and personalization
+
+Yes: the full [default JSON brain](src/cell/default-brain.json) ships in the repository, source ZIP and built app: **693 memory nodes, 303 pathways, and 554 associations**. It is an authored simulated biography with retrieval and experience rules, independent of any AI service. Saved play sessions and credentials are excluded. You can keep it, adapt it, replace it with your own graph, or start empty.
+
+Start with [Make the experience your own](docs/CUSTOMIZATION.md). It includes copyable instructions for your coding agent, a map of customization points, and guidance on character identity, personality, progress and privacy.
+
+| Guide | Use it to |
+| --- | --- |
+| [Personalization](docs/CUSTOMIZATION.md) | Choose a character and experience, and brief your coding agent |
+| [JSON brains](docs/JSON-BRAIN.md) | Author biography, pathways, associations and evidence-based tendencies |
+| [API and OAuth](docs/API-INTEGRATION.md) | Connect and name your own agent using your chosen service |
+| [New scenarios](docs/SCENARIOS.md) | Build another setting with consistent physics, perception, actions and memory |
+| [New features](docs/EXTENDING.md) | Add interactions, sensors, controls and backend capabilities |
+
+The embodied character can use the implemented actions; your coding agent can change the host project's source. New scenarios and host features require implementation rather than only intercom instructions. The current cell is the included starting scenario.
+
 ## Create your own JSON brain
 
 Follow [the JSON brain guide](docs/JSON-BRAIN.md) to create a character with our memory nodes, cue pathways, associations, explicit personality effects, optional experience learning, and live recall visualization. Start with [the validated fictional example](examples/brain.starter.json):

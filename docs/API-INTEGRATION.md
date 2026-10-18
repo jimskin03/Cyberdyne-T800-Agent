@@ -139,4 +139,8 @@ Neural voice, autonomous companion services and account-connected browsing are e
 
 ## Looking and snapshots
 
-`look_at`, `inspect`, and `snapshot {target?}` aim and settle before capturing a fresh 1280?720 optical frame. The agent interprets that frame while the gaze remains held, then reports its observations immediately. Snapshot is internal optical capture; it does not save or upload a photo file. A configured vision model is required. Concurrent captures share the next frame; cancellation aborts pending capture and interpretation. Geometric view candidates are navigation metadata, not pixel recognition, and their omission does not prove an object is absent.
+`look_at`, `inspect`, and `snapshot {target?}` aim and settle before capturing a fresh 1280x720 optical frame. The agent interprets that frame while the gaze remains held, then reports its observations immediately. Snapshot is internal optical capture; it does not save or upload a photo file. A configured vision model is required. Concurrent captures share the next frame; cancellation aborts pending capture and interpretation. Geometric view candidates are navigation metadata, not pixel recognition, and their omission does not prove an object is absent.
+
+## Personalize the connected experience
+
+Connecting your service provides generation; it does not automatically change the character's role, biography, avatar or tools. Follow [Personalization](CUSTOMIZATION.md) to brief your coding agent, [Scenario development](SCENARIOS.md) for another setting, and [Feature development](EXTENDING.md) to add real capabilities. Keep new integrations behind explicit backend contracts and preserve the generic agent display name and model aliases.

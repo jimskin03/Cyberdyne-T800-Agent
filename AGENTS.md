@@ -2,6 +2,10 @@
 
 This repository is the standalone cell scene. Read README.md and RELEASE-REVIEW.md before changing release scope.
 
+- Personalization: read `docs/CUSTOMIZATION.md`. The full default fictional JSON brain ships with the package; retain it unless the user wants another character. Distinguish the coding agent editing source from the embodied agent using supported actions.
+- Scenarios: follow `docs/SCENARIOS.md`. There is no existing general scenario loader. Keep world geometry, collision/navigation data, target resolution, sensors, prompts, UI, shortcuts and production entries consistent; isolate saved state between scenarios.
+- Features: follow `docs/EXTENDING.md`. Implement real state changes and truthful results, wire the supported action catalog and dispatcher together, preserve cancellation and request pacing, and document meaningful limitations.
+
 - JSON brain work: follow `docs/JSON-BRAIN.md`, begin with `examples/brain.starter.json`, and validate through the actual runtime with `npm run brain:validate -- path/to/brain.json "query"`.
 - API work: follow `docs/API-INTEGRATION.md`. Configure the user's chosen service through API-key, OAuth or local-server authentication. Keep API keys, OAuth client secrets and tokens only in the backend; ignored local `.env` may hold configuration and secrets. Never print key values, copy private configuration into source, or use frontend `VITE_*` variables for secrets.
 - Preserve the separation between authored biography, recorded cell events, current sensor observations, model proposals and executed action results. Canonical backstory must not become a log of model guesses.
