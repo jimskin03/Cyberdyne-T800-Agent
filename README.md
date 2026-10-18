@@ -15,7 +15,7 @@ npm run dev
 
 Open http://127.0.0.1:5340 and select **Open the feed**. No API key is needed. The local scene uses browser speech and browser storage. State is scoped to this package. **Reset session memory** starts fresh with AI off; **Restore previous session** provides one local undo slot. Neither saved state nor the undo slot is included in source exports. AI starts off for a new visitor and remembers the operator's later choice.
 
-On desktop, use the **−** button in JSON Brain, Mind Stream, or Conversation to minimize that panel. Its title bar stays visible; select **+** to restore it. Minimizing preserves the current conversation, settings, and memory selection. Hold the JSON Brain title bar briefly, then drag to move the box. You can also focus its title bar and use the arrow keys to move it or **Home** to reset its position.
+On desktop, use the **−** button in JSON Brain, Mind Stream, Thoughts, or Dialogue to minimize each panel independently. Its title or label stays visible; select **+** to restore it. Minimizing preserves the conversation, settings, and memory selection, and the intercom remains available. Drag the JSON Brain title bar to move the box (the minimize button remains clickable). You can also focus its title bar and use the arrow keys to move it or **Home** to reset its position.
 
 On phones and short landscape screens, **Controls** opens the operator settings, including **AI mind**, and **Memory** opens the interactive JSON brain. Each panel scrolls and has a **Close** button. Selecting a tool closes Controls so you can tap the unit in the scene.
 

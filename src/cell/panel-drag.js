@@ -12,7 +12,7 @@ export function setupPanelDrag(panel){
  let gesture=null,position=null;
  heading.classList.add('panel-drag-handle');
  heading.setAttribute('role','group');
- heading.title='Hold and drag to move. Arrow keys move; Home resets the position.';
+ heading.title='Drag to move. Arrow keys move; Home resets the position.';
 
  function place(x,y){
   const rect=panel.getBoundingClientRect();
@@ -23,7 +23,6 @@ export function setupPanelDrag(panel){
  }
  function finish(){
   if(!gesture)return;
-  clearTimeout(gesture.timer);
   const id=gesture.id;gesture=null;
   panel.classList.remove('panel-dragging');
   if(heading.hasPointerCapture(id))heading.releasePointerCapture(id);
@@ -39,15 +38,14 @@ export function setupPanelDrag(panel){
   const current={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top,active:false};
   gesture=current;
   heading.setPointerCapture(event.pointerId);
-  current.timer=setTimeout(()=>{
-   if(gesture!==current)return;
-   current.active=true;place(current.left,current.top);panel.classList.add('panel-dragging');
-  },350);
  };
  const pointerMove=event=>{
   if(!gesture||event.pointerId!==gesture.id)return;
   const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
-  if(!gesture.active){if(Math.hypot(dx,dy)>6)finish();return;}
+  if(!gesture.active){
+   if(Math.hypot(dx,dy)<=6)return;
+   gesture.active=true;panel.classList.add('panel-dragging');
+  }
   event.preventDefault();place(gesture.left+dx,gesture.top+dy);
  };
  const keyDown=event=>{

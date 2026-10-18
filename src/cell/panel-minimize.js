@@ -2,18 +2,16 @@ import './panel-minimize.css';
 
 export function setupPanelMinimize(memory){
  const cleanups=[];
+ const mind=document.getElementById('mindpanel');
+ const thoughts=document.getElementById('thought-row');
+ const dialogue=document.getElementById('dialogue');
  const panels=[
-  [memory,'JSON Brain','.jb-heading'],
-  [document.getElementById('mindpanel'),'Mind Stream','.panel-title'],
-  [document.getElementById('bottom'),'Conversation',null],
+  [memory,'JSON Brain',memory.querySelector('.jb-heading')],
+  [mind,'Mind Stream',mind.querySelector('.panel-title')],
+  [thoughts,'Thoughts',thoughts],
+  [dialogue,'Dialogue',dialogue.querySelector(':scope > span')],
  ];
- for(const [panel,label,selector] of panels){
-  let heading=selector?panel.querySelector(selector):null;
-  if(!heading){
-   heading=document.createElement('div');heading.className='panel-title conversation-heading';
-   const title=document.createElement('span');title.textContent=label.toUpperCase();
-   heading.append(title);panel.prepend(heading);
-  }
+ for(const [panel,label,heading] of panels){
   heading.classList.add('minimize-heading');
   panel.classList.add('minimizable-panel');
   const button=document.createElement('button');button.type='button';button.className='panel-minimize';
@@ -26,7 +24,12 @@ export function setupPanelMinimize(memory){
    button.title=(minimized?'Restore ':'Minimize ')+label;
   }
   const click=()=>update(!panel.classList.contains('panel-minimized'));
-  button.addEventListener('click',click);cleanups.push(()=>button.removeEventListener('click',click));
+  button.addEventListener('click',click);
+  cleanups.push(()=>{
+   button.removeEventListener('click',click);button.remove();
+   heading.classList.remove('minimize-heading');
+   panel.classList.remove('minimizable-panel','panel-minimized');
+  });
   heading.append(button);update(false);
  }
  return {destroy(){for(const cleanup of cleanups)cleanup();}};
