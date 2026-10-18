@@ -1,8 +1,8 @@
 import {test,expect} from '@playwright/test';
 
 test('desktop panels minimize independently and JSON Brain moves by its title bar',async({page})=>{
- test.setTimeout(240_000); // GitHub Actions runs WebGL through software SwiftShader.
- await page.setViewportSize({width:1600,height:900});
+ test.setTimeout(420_000); // GitHub Actions runs WebGL through software SwiftShader.
+ await page.setViewportSize({width:1152,height:720}); // Same desktop size as the smoke tests; fewer software-rendered pixels per frame.
  await page.goto('/');
  await page.locator('#go').click({force:true});
 
