@@ -2,13 +2,16 @@
 .panel-minimize{flex:0 0 auto;margin-left:auto;min-width:28px;min-height:28px;padding:2px 7px;font:16px var(--mono);line-height:1;letter-spacing:0}
 .json-brain .panel-minimize{font:16px monospace;padding:2px 7px}
 .panel-minimize:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
-.conversation-heading{width:100%;max-width:680px;margin:0;padding:4px 10px;background:var(--glass);border:1px solid var(--line);border-radius:5px}
-body.clean .conversation-heading{display:none}
+#thought-row.minimize-heading{display:flex;align-items:center}
+#thought-row #thought{flex:1;min-width:0}
+#dialogue>span.minimize-heading{display:flex;align-items:center}
 @media(min-width:761px) and (min-height:501px){
- .panel-minimized>:not(.minimize-heading){display:none!important}
- .panel-minimized>.minimize-heading{margin-bottom:0}
+ .json-brain.panel-minimized>:not(.minimize-heading),#mindpanel.panel-minimized>:not(.minimize-heading){display:none!important}
+ .json-brain.panel-minimized>.minimize-heading,#mindpanel.panel-minimized>.minimize-heading{margin-bottom:0}
  #mindpanel.panel-minimized{bottom:auto}
+ #thought-row.panel-minimized #thought,#dialogue.panel-minimized #line{display:none!important}
+ #dialogue.panel-minimized{padding-top:5px;padding-bottom:5px}
 }
 @media(max-width:760px),(max-height:500px){
- .panel-minimize,.conversation-heading{display:none}
+ .panel-minimize{display:none}
 }

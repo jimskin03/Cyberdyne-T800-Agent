@@ -23,7 +23,7 @@ Open http://127.0.0.1:5340 and select **Open the feed**. No API key is needed: t
 
 ## Using the interface
 
-- **Desktop:** the **−** button on JSON Brain, Mind Stream, or Conversation minimizes that panel to its title bar; **+** restores it. Minimizing keeps the conversation, settings, and memory selection. To move the JSON Brain box, hold its title bar briefly and drag. You can also focus the title bar and use the arrow keys, or press **Home** to reset its position.
+- **Desktop:** the **−** button on JSON Brain, Mind Stream, Thoughts, or Dialogue minimizes that panel independently, leaving its title or label visible; **+** restores it. Minimizing keeps the conversation, settings, and memory selection, and the intercom stays available. To move the JSON Brain box, drag its title bar (no hold needed; the minimize button stays clickable). You can also focus the title bar and use the arrow keys, or press **Home** to reset its position.
 - **Phones and short landscape screens:** **Controls** opens the operator settings, including **AI mind**, and **Memory** opens the interactive JSON brain. Each panel scrolls and has a **Close** button (Escape also closes it). Selecting a tool closes Controls so you can tap the unit.
 - **Keyboard:** 1–8 arm a tool, G grapple, C his computer, V swap POV, P punk, B baby, M mute, H hide UI.
 
