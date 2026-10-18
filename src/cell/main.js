@@ -35,6 +35,10 @@ import {createConnectionController} from './ui/connection-controller.js';
 import {createIntercomController} from './ui/intercom-controller.js';
 import {createHudController} from './ui/hud-controller.js';
 import {createComputerController} from './ui/computer-controller.js';
+import {createSpeechCoordinator} from './app/speech-coordinator.js';
+import {createActionQueue} from './app/action-queue.js';
+import {createThoughtScheduler} from './app/thought-scheduler.js';
+import {createCellApp} from './app/create-cell-app.js';
 import {createAudio} from '../audio.js';
 import {TOOLS} from '../tools.js';
 import {strip} from '../lines.js';
@@ -225,7 +229,6 @@ const save = () => {
 const audio = createAudio({windowsVoice: true});
 const aiEnabled = sessionStore.getAiEnabled();
 const thoughtClock = createThoughtClock();
-let nextOfflineMoveAt = 0;
 const mind = createMind({enabled: aiEnabled});
 $('use-brain').checked = aiEnabled;
 const computer = createComputer();
@@ -754,16 +757,9 @@ function recordHurt(text, amount = 0, part = 'body', tool = 'impact') {
   } else addEvent('pain', text, true);
 }
 // ---------- thinking: paced snapshots and priority dialogue ----------
+let thoughtScheduler;
 function thinkNow(interrupt = true) {
-  if (state.thinking) {
-    if (!interrupt || state.thinking.intercom) return;
-    state.thinking.ac.abort();
-    state.events.unshift(...state.thinking.consumed);
-    state.thinking = null;
-  }
-  state.thinkBackoffUntil = 0;
-  state.beatsSince = 99;
-  think();
+  return thoughtScheduler.requestNow(interrupt);
 }
 async function think() {
   if (
@@ -940,6 +936,14 @@ async function think() {
     }
   }
 }
+thoughtScheduler = createThoughtScheduler({
+  state,
+  runThought: think,
+  isOnline: () => mind.online,
+  isHidden: () => document.hidden,
+  randomAction,
+});
+
 const wordsOf = (s) =>
   new Set(
     String(s)
@@ -1009,124 +1013,40 @@ function apply(d, urgent = false, model = true, priority = urgent ? 'intercom' :
 }
 // A chosen line waits for current speech. Only model speech is checked for repetition;
 // explicit operator commands can intentionally request the same words again.
-function say(text, urgent = false, options = {}) {
-  text = String(text || '').trim();
-  if (!text && !options.vocalize) return;
-  const history = speechHistory(state.journal, state.spokenHistory || []),
-    freshPain = options.priority === 'pain';
-  if (options.model && text && repeatedSpeech(text, history, {freshPain})) {
-    text = stripRepeatedSentences(text, history, {freshPain});
-    if (repeatedSpeech(text, history, {freshPain})) text = '';
-    if (!text && !options.vocalize) {
-      state.loopFeedback =
-        'Your last proposed sentence repeated old dialogue and was not spoken. Develop a new concrete response to what is happening now.';
-      return;
-    }
-  }
-  state.loopFeedback = '';
-  const priority = options.priority || 'normal';
-  if (
-    audio.voice.speaking &&
-    (!urgent || (priority === 'pain' && state.voicePriority === 'pain'))
-  ) {
-    if (
-      priority === 'pain' ||
-      state.pendingSpeech?.options.priority !== 'pain' ||
-      Date.now() > (state.pendingSpeech?.expiresAt || Infinity)
-    )
-      state.pendingSpeech = {
-        text,
-        options,
-        expiresAt: Date.now() + (priority === 'intercom' ? 120000 : 30000),
-      };
-    return;
-  }
-  state.pendingSpeech = null;
-  state.voicePriority = priority;
-  state.lastSaid = text;
-  journal('say', strip(text));
-  state.spokenHistory = speechHistory(state.journal, [...(state.spokenHistory || []), strip(text)]);
-  $('line').textContent = text ? '“' + strip(text) + '”' : options.vocalize;
-  $('dialogue').classList.remove('dim');
-  audio.voice.say('ai', null, text, options);
-}
-function runNext(t) {
-  if (
-    berserker?.active ||
-    waterMode?.active ||
-    grapple?.active ||
-    state.current ||
-    !state.queue.length ||
-    t < state.nextActionAt
-  )
-    return;
-  const a = state.queue.shift();
-  state.current = a;
-  a.t0 = t;
-  const controller = new AbortController(),
-    tok = {cancelled: false, signal: controller.signal, abort: () => controller.abort()};
-  a.tok = tok;
-  const before = {x: body.st.x, z: body.st.z};
-  const action = Object.fromEntries(Object.entries(a).filter(([k]) => !['tok', 't0'].includes(k)));
-  journal('act', actText(a), {action});
-  $('doing').textContent = actText(a);
-  if (/^(browser|slopcannon)$/.test(a.do || '')) state.lastBrowserCheck = Date.now();
-  actions
-    .run(a, tok)
-    .then((res) => {
-      if (tok.cancelled) return;
-      if (tok.observation) state.pendingObservation = tok.observation;
-      if (res) {
-        state.events.push({kind: 'result', text: res, t: hh(state.simMin)});
-        if (/repair|create_3d|code|draw|write/.test(action.do || ''))
-          lifeMemory.experience.observe({
-            id: crypto.randomUUID(),
-            kind: /could not|failed|unable|not reached/i.test(res)
-              ? 'task_failure'
-              : /repaired|created|built|finished|completed|wrote|drew|saved|installed|success/i.test(
-                    res,
-                  )
-                ? 'task_success'
-                : null,
-            source: 'world',
-            observed: true,
-            text: res,
-            choice: actText(action),
-          });
-        journal('result', res + ' ' + nervous.describe(), {
-          action,
-          progress: Math.hypot(body.st.x - before.x, body.st.z - before.z),
-          remaining: body.navigation?.remaining,
-        });
-      }
-    })
-    .catch((e) => {
-      if (e !== INTERRUPT && !tok.cancelled && e?.name !== 'AbortError') {
-        console.error(e);
-        const res = 'That action failed: ' + String(e?.message || e).slice(0, 220);
-        state.events.push({kind: 'result', text: res, t: hh(state.simMin)});
-        journal('result', res, {action, success: false});
-        lifeMemory.experience.observe({
-          id: crypto.randomUUID(),
-          kind: 'task_failure',
-          source: 'world',
-          observed: true,
-          text: res,
-          choice: actText(action),
-        });
-      }
-    })
-    .finally(() => {
-      if (state.current === a) {
-        state.current = null;
-        $('doing').textContent = state.queue.length ? '…' : '';
-        if (!state.queue.length) state.operatorBusy = false;
-      }
-      state.nextActionAt = performance.now() / 1000 + 0.35 + Math.random() * 0.6;
-      save();
-      if (state.pendingObservation) setTimeout(() => think(), 0);
-    });
-}
+const speechCoordinator = createSpeechCoordinator({
+  state,
+  audio,
+  journal,
+  strip,
+  speechHistory,
+  repeatedSpeech,
+  stripRepeatedSentences,
+  onLine: (line) => {
+    $('line').textContent = line;
+    $('dialogue').classList.remove('dim');
+  },
+});
+const say = (...args) => speechCoordinator.say(...args);
+
+const actionQueue = createActionQueue({
+  state,
+  actions,
+  body,
+  nervous,
+  lifeMemory,
+  journal,
+  describeAction: actText,
+  formatTime: hh,
+  save,
+  isBlocked: () => !!berserker?.active || !!waterMode?.active || !!grapple?.active,
+  onDoing: (text) => {
+    $('doing').textContent = text;
+  },
+  scheduleThought: () => thoughtScheduler.scheduleThought(),
+  interrupt: INTERRUPT,
+});
+const runNext = (time) => actionQueue.runNext(time);
+
 // Pulse is audiovisual feedback only; it never logs full snapshots or starts inference.
 function onBeat(t) {
   state.beat++;
@@ -1134,23 +1054,6 @@ function onBeat(t) {
   if (state.heartSound && audio.enabled) audio.sfx('heart');
   ecgBlip();
 }
-function tickThoughts() {
-  if (!state.started || state.thinking || document.hidden) return;
-  if (mind.online) {
-    think();
-    return;
-  }
-  if (
-    !state.current &&
-    !state.queue.length &&
-    !state.operatorBusy &&
-    Date.now() >= nextOfflineMoveAt
-  ) {
-    state.queue = [randomAction()];
-    nextOfflineMoveAt = Date.now() + 4000;
-  }
-}
-
 // ---------- the operator's tools: pick one, then click on him ----------
 function select(id) {
   if (berserker?.active) return;
@@ -1654,7 +1557,7 @@ function tick(ms) {
       state.beatPhase -= 1;
       onBeat(t);
     }
-    tickThoughts();
+    thoughtScheduler.poll();
     runNext(t);
     ambient(t);
     const lo = world.lightsOn;
@@ -1668,11 +1571,7 @@ function tick(ms) {
     state.lightsOn = lo;
   }
   world.setTime((state.simMin % 1440) / 60, state.weather);
-  if (state.started && state.pendingSpeech && !audio.voice.speaking) {
-    const p = state.pendingSpeech;
-    state.pendingSpeech = null;
-    if (Date.now() <= (p.expiresAt || Infinity)) say(p.text, false, p.options);
-  }
+  speechCoordinator.flushPending();
   grapple?.update(t, dt);
   berserker?.update(t, dt);
   actions.tick(t);
@@ -1689,23 +1588,13 @@ function tick(ms) {
     }
   }
 }
-function frame(ms) {
-  try {
-    tick(ms);
-  } catch (e) {
-    console.error(e);
-  }
-  requestAnimationFrame(frame);
-}
-setInterval(() => {
-  if (document.hidden)
-    try {
-      tick(performance.now());
-    } catch (e) {
-      console.error(e);
-    }
-}, 250);
-requestAnimationFrame(frame);
+const app = createCellApp({
+  state,
+  tick,
+  save,
+});
+app.start();
+
 // ---------- his computer: a desktop the audience can open, run his apps (sandboxed) and read his notes ----------
 const computerUI = createComputerController({
   computer,
@@ -1776,12 +1665,6 @@ const restored = sessionStore.loading.then(async ({snapshot, data, local}) => {
   // Reattach to an existing browser session after a reload; do not navigate or fire.
   slop.st.active = true;
   await slop.poll();
-});
-setInterval(() => {
-  if (state.started) save();
-}, 5000);
-addEventListener('pagehide', () => {
-  if (state.started) save();
 });
 slop.onChange((s) => {
   if (s.image) {
@@ -1957,6 +1840,7 @@ window.__CELL = {
   climate,
   luna,
   berserker,
+  app,
 };
 window.dispatchEvent?.(new Event('cell:ready'));
 if (new URLSearchParams(location.search).has('auto')) setTimeout(() => $('go').click(), 800);
