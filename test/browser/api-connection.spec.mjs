@@ -100,3 +100,59 @@ test('private scene settings discover and switch models without env configuratio
   await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
  }
 });
+
+test('phone chat shows provider failure after model discovery and recovers on the next question',async({page})=>{
+ test.setTimeout(180_000);
+ const key='mock-chat-error-fixture',errors=[];
+ let fail=true,failedCalls=0;
+ const server=createApiServer(apiConfiguration({}),{fetcher:async(endpoint,options)=>{
+  if(endpoint.endsWith('/models'))return Response.json({data:[{id:'unit-model'}]});
+  const body=JSON.parse(options.body);
+  const isQuestion=JSON.stringify(body.messages).includes('LATEST INTERCOM MESSAGE (answer this first):');
+  if(isQuestion&&fail){
+   failedCalls++;
+   // A provider can report a failure in a successful HTTP response.
+   return Response.json({error:{code:402,message:'Private diagnostic '+key}});
+  }
+  return Response.json({choices:[{message:{content:JSON.stringify({thought:'A new message.',say:isQuestion?'Hello, I can hear you now.':'I listen to the room.',actions:[]})}}]});
+ }});
+ server.listen(0,'127.0.0.1');await once(server,'listening');
+ const backend='http://127.0.0.1:'+server.address().port;
+ page.on('pageerror',error=>errors.push(String(error)));
+ try{
+  await page.route('**/llm/**',async route=>{
+   const path=new URL(route.request().url()).pathname.replace(/^\/llm/,'');
+   const response=await route.fetch({url:backend+path});
+   await route.fulfill({response});
+  });
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/');
+  await page.waitForFunction(()=>window.__CELL?.world);
+  await page.locator('#go').click();
+  await page.locator('#controls-toggle').click();
+  await page.locator('#openai-api-toggle').click();
+  await page.locator('#openai-base').fill('https://openrouter.ai/api/v1');
+  await page.locator('#openai-key').fill(key);
+  await page.locator('#openai-fetch-models').click();
+  await expect(page.locator('#openai-model-status')).toContainText('1 models found');
+  await page.locator('#openai-model-options').selectOption('unit-model');
+  await page.locator('#openai-model').press('Enter');
+  await expect(page.locator('#use-brain')).toBeChecked();
+  await page.locator('#lab .mobile-panel-close').click();
+  await page.locator('#ask').fill('Hello, issue 40 greeting');
+  await page.locator('#ask').press('Enter');
+  await expect(page.locator('#reply-status')).toContainText('insufficient credits or quota',{timeout:45_000});
+  expect(await page.evaluate(()=>window.__CELL.state.events.some(event=>event.kind==='intercom'))).toBe(false);
+  expect(failedCalls).toBe(1);
+  expect(await page.locator('#reply-status').textContent()).not.toContain(key);
+  fail=false;
+  await page.locator('#ask').fill('Hello again, issue 40 greeting');
+  await page.locator('#ask').press('Enter');
+  await expect(page.locator('#mind')).toContainText('Hello, I can hear you now.',{timeout:45_000});
+  await expect(page.locator('#reply-status')).toHaveText('Reply received.');
+  expect(errors).toEqual([]);
+ }finally{
+  await page.unrouteAll({behavior:'wait'}).catch(()=>{});
+  await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
+ }
+});

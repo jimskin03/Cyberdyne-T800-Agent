@@ -127,7 +127,7 @@ Preserve system, user and assistant roles, including correction turns. Content m
 {"type":"image_url","image_url":{"url":"data:image/jpeg;base64,..."}}
 ```
 
-The backend maps aliases and constructs authorization itself, dropping unsupported service-specific fields such as `effort`. A chat request must not select an upstream URL, model ID, or authorization header. Operator connection uses the separate local `POST /connection` route described above.
+The backend maps aliases and constructs authorization itself, dropping unsupported service-specific fields such as top-level `effort`. For the configured `openrouter.ai` endpoint only, the app's `effort: "low"` becomes `reasoning: { "effort": "low" }` so a routed reasoning model can leave room for answer text within the existing output budget. The token limit is unchanged, and client-supplied `reasoning` objects are ignored. See [OpenRouter's reasoning-token contract](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens). A chat request must not select an upstream URL, model ID, or authorization header. Operator connection uses the separate local `POST /connection` route described above.
 
 Return a nonstreaming envelope with a **string** in `choices[0].message.content`:
 
@@ -158,6 +158,10 @@ Pulse and sensor simulation do not trigger inference or log full snapshots on ea
 - When a live connection test is requested, verify a text reply, an image request if configured, cancellation, expired/revoked access and quota failure. Inspect diagnostics without printing secrets. A mocked test does not establish live compatibility.
 
 If the agent does not answer, inspect the status below the chat input. Check that AI is enabled, the backend is running, and OAuth sign-in is complete when required. Pending and failed replies have explicit status. Follow-up questions queue behind a reply already in progress.
+
+Successful model discovery and a green connection status only confirm local configuration and model-list access. They do not verify chat access. Chat failures now identify authentication, billing/quota, permissions, unavailable models, rate limits, context/output limits, provider outages and content-policy refusals below the chat input. Update API settings or the provider account according to that message. Failed transport requests are not immediately repeated; a later question can try again.
+
+The adapter returns authored `{ "error": "safe explanation", "code": "provider_rate_limited" }` diagnostics with HTTP 502 for provider failures. It checks error envelopes even on HTTP 200, including errors attached to a completion choice, and rejects partial output marked as failed. Raw provider messages and metadata never reach the browser. Empty reasoning-only responses are not spoken answers; when the output budget is exhausted, select another chat model or adapt the backend's output/reasoning budget for your service. See [OpenRouter's error documentation](https://openrouter.ai/docs/api/reference/errors-and-debugging) for its error envelopes and reasoning-budget behavior.
 
 ## Deployment
 

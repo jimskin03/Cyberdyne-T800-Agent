@@ -909,7 +909,9 @@ async function think() {
     );
     if (job !== state.thinking) return;
     if (!d) {
-      state.events.unshift(...job.consumed);
+      // Keep scene events for context, but a failed question waits for the user
+      // to send it again instead of spending more requests every five seconds.
+      state.events.unshift(...job.consumed.filter((event) => event.kind !== 'intercom'));
       state.thinkBackoffUntil = Date.now() + 5000;
       if (job.intercom) state.replyError = mind.st.lastError || 'No reply returned. Try again.';
       return;

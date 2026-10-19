@@ -12,5 +12,8 @@ export function validateChatRequest(body,live){
  const model=body.model==='vision'?(live.visionModel||live.textModel):body.model==='creative'?(live.creativeModel||live.visionModel||live.textModel):live.textModel;
  const payload={model,messages,stream:false};
  for(const field of ['max_tokens','temperature'])if(body[field]!==undefined)payload[field]=body[field];
+ // OpenRouter's free router can select reasoning models. Preserve the app's
+ // bounded reasoning preference using that service's supported wire format.
+ if(body.effort==='low'&&live.endpoint&&new URL(live.endpoint).hostname==='openrouter.ai')payload.reasoning={effort:'low'};
  return {ok:true,payload};
 }

@@ -1,7 +1,15 @@
+import {LlmRequestError} from './request-errors.js';
+
 export function createLlmClient({fetcher = globalThis.fetch} = {}) {
   async function json(url, options = {}) {
     const response = await fetcher(url, options);
-    if (response.ok === false) throw new Error('HTTP ' + response.status);
+    if (response.ok === false) {
+      let body;
+      try {
+        body = await response.json();
+      } catch {}
+      throw new LlmRequestError(response.status, body?.code);
+    }
     return response.json();
   }
 

@@ -68,9 +68,9 @@ export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcur
    const checked=validateChatRequest(body,live);
    if(!checked.ok)return send(checked.status,{error:checked.error});
    const upstream=await requestUpstream({live,payload:checked.payload,oauth,fetcher,signal:controller.signal,modeOf:connections.modeOf});
-   if(!upstream.ok){if(upstream.tooLarge)controller.abort();return send(502,{error:upstream.error});}
+   if(!upstream.ok){if(upstream.tooLarge)controller.abort();return send(502,{error:upstream.error,code:upstream.code});}
    send(200,{choices:[{message:{role:'assistant',content:upstream.content}}]});
-  }catch(error){send(error.status||(controller.signal.aborted?504:502),{error:error.status?error.message:controller.signal.aborted?'Provider request timed out.':'API adapter request failed.'});}
+  }catch(error){send(error.status||(controller.signal.aborted?504:502),{error:error.status?error.message:controller.signal.aborted?'Provider request timed out.':'API adapter request failed.',...(!error.status?{code:controller.signal.aborted?'provider_timeout':'provider_request_failed'}:{})});}
   finally{clearTimeout(timer);res.off('close',cancel);active--;}
  });
 }
