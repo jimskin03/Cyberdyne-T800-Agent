@@ -3,13 +3,14 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {CSS2DRenderer,CSS2DObject} from 'three/addons/renderers/CSS2DRenderer.js';
 import {networkLayout,evidenceTrace} from './memory-network.js';
 import './json-brain.css';
+import {filterPickerItems,pickerItemLabel} from './json-brain-picker.js';
 const palette={timeline:0x71b9f5,personal:0xb897e6,knowledge:0xf0b961,everyday:0x83d5b2};
 const regionNames={timeline:'Life timeline',personal:'Personal memories',knowledge:'Skills & world',everyday:'Everyday life'};
 export function createJsonBrain({context='interview'}={}){
  const panel=document.createElement('aside');panel.className='json-brain';panel.dataset.context=context;panel.setAttribute('aria-label','Interactive JSON brain');
- panel.innerHTML='<div class="jb-heading"><b>JSON BRAIN</b><span class="jb-count"></span></div><div class="jb-status" role="status">Waiting for memory chip</div><div class="jb-viewport"></div><div class="jb-legend"></div><div class="jb-tools"><button aria-label="Pan neural network" aria-pressed="false">Pan</button><button aria-label="Zoom in neural network">+</button><button aria-label="Zoom out neural network">−</button><button aria-label="Reset neural network view">Reset view</button><button aria-label="Toggle neural detail" aria-pressed="false">High detail</button></div><div class="jb-help">Drag to rotate · right drag to pan · scroll into JSON</div><select aria-label="Inspect memory JSON"><option value="">Select a memory or pathway</option></select><div class="jb-tabs" hidden><button data-tab="json" class="chosen">JSON payload</button><button data-tab="trace">Path trace</button></div><pre class="jb-inspector" hidden></pre>';
+ panel.innerHTML='<div class="jb-heading"><b>JSON BRAIN</b><span class="jb-count"></span></div><div class="jb-status" role="status">Waiting for memory chip</div><div class="jb-viewport"></div><div class="jb-legend"></div><div class="jb-tools"><button aria-label="Pan neural network" aria-pressed="false">Pan</button><button aria-label="Zoom in neural network">+</button><button aria-label="Zoom out neural network">−</button><button aria-label="Reset neural network view">Reset view</button><button aria-label="Toggle neural detail" aria-pressed="false">High detail</button></div><div class="jb-help">Drag to rotate · right drag to pan · scroll into JSON</div><div class="jb-picker"><button type="button" class="jb-picker-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Inspect memory JSON">Select a memory or pathway</button><div class="jb-picker-panel" hidden><input type="search" class="jb-picker-search" placeholder="Search memories or pathways" aria-label="Search memories or pathways" autocomplete="off" enterkeyhint="search"><div class="jb-picker-empty" hidden>No matches</div><div class="jb-picker-list" role="listbox" aria-label="Memories and pathways"></div></div></div><div class="jb-tabs" hidden><button data-tab="json" class="chosen">JSON payload</button><button data-tab="trace">Path trace</button></div><pre class="jb-inspector" hidden></pre>';
  document.body.append(panel);
- const viewport=panel.querySelector('.jb-viewport'),status=panel.querySelector('.jb-status'),inspector=panel.querySelector('pre'),select=panel.querySelector('select'),tabs=panel.querySelector('.jb-tabs');
+ const viewport=panel.querySelector('.jb-viewport'),status=panel.querySelector('.jb-status'),inspector=panel.querySelector('pre'),tabs=panel.querySelector('.jb-tabs');const picker=panel.querySelector('.jb-picker'),trigger=picker.querySelector('.jb-picker-trigger'),pickerPanel=picker.querySelector('.jb-picker-panel'),search=picker.querySelector('.jb-picker-search'),pickerList=picker.querySelector('.jb-picker-list'),pickerEmpty=picker.querySelector('.jb-picker-empty');
  const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(43,1,.05,100);camera.position.set(-.4,.6,8.8);
  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));viewport.append(renderer.domElement);
  const labels=new CSS2DRenderer();labels.domElement.className='jb-labels';viewport.append(labels.domElement);
@@ -20,14 +21,34 @@ export function createJsonBrain({context='interview'}={}){
  const box=new THREE.Box3Helper(new THREE.Box3(new THREE.Vector3(-4,-3.65,-2.6),new THREE.Vector3(4,3,2.6)),0x335565);box.material.transparent=true;box.material.opacity=.35;scene.add(box);
  const axes=new THREE.AxesHelper(.55);axes.position.set(-3.65,-3.4,2.25);scene.add(axes);
  const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),highlight=new THREE.Color(0xd4fff0);
- let memory=null,unsubscribe=null,items=[],edges=[],trace=null,started=0,clock=0,selected=null,highDetail=context==='explorer',inspectorTab='json',points=null,pointColors=null,pointSizes=null,baseLines=null,activeLines=null,pulses=null,pulsePositions=null,activeEdges=[],labelObjects=[],labelTime=0;
+ let memory=null,unsubscribe=null,items=[],edges=[],trace=null,started=0,clock=0,selected=null,highDetail=context==='explorer',inspectorTab='json',points=null,pointColors=null,pointSizes=null,baseLines=null,activeLines=null,pulses=null,pulsePositions=null,activeEdges=[],labelObjects=[],labelTime=0,pickerOpen=false,pickerQuery='';const PLACEHOLDER='Select a memory or pathway';
  const nodeMaterial=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{scale:{value:300}},vertexShader:'attribute vec3 aColor; attribute float aSize; varying vec3 vColor; uniform float scale; void main(){vColor=aColor;vec4 p=modelViewMatrix*vec4(position,1.0);gl_PointSize=clamp(aSize*scale/-p.z,1.3,36.0);gl_Position=projectionMatrix*p;}',fragmentShader:'varying vec3 vColor; void main(){float r=length(gl_PointCoord-.5)*2.0;if(r>1.0)discard;float glow=pow(1.0-r,1.7);float core=1.0-smoothstep(.0,.3,r);gl_FragColor=vec4(vColor*(.55+core),glow*.85+core*.7);}'});
  function resize(){const w=viewport.clientWidth,h=viewport.clientHeight;if(!w||!h)return;renderer.setSize(w,h);labels.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();nodeMaterial.uniforms.scale.value=h*renderer.getPixelRatio()/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)));}
  const observer=new ResizeObserver(resize);observer.observe(viewport);resize();
  function clearGraph(){for(const l of labelObjects){l.element.remove();scene.remove(l);}labelObjects=[];group.traverse(o=>{o.geometry?.dispose();o.userData.texture?.dispose();if(o.material&&o.material!==nodeMaterial)o.material.dispose();});group.clear();items=[];edges=[];activeEdges=[];points=null;}
  function label(text,position,className='jb-node-label'){const element=document.createElement('div');element.className=className;element.textContent=text;const object=new CSS2DObject(element);object.position.fromArray(position);scene.add(object);labelObjects.push(object);return object;}
  function refreshInspector(){tabs.hidden=!selected;inspector.hidden=!selected;inspector.textContent=selected?(inspectorTab==='json'?JSON.stringify(selected.json,null,2):JSON.stringify({selected:selected.id,recall:trace?.query||null,paths:trace?.pathways?.map(p=>({id:p.id,from:p.from,activation:p.activation,route:p.route.map(n=>n.id)}))||[]},null,2)):'';panel.dispatchEvent(new CustomEvent('brain:selection',{detail:selected?{id:selected.id,json:selected.json,trace}:null}));}
- function inspect(id,focus=false){selected=items.find(n=>n.id===id)||null;select.value=selected?.id||'';refreshInspector();if(selected&&focus){const p=new THREE.Vector3(...selected.position);controls.target.copy(p);camera.position.copy(p).add(new THREE.Vector3(0,.15,3.1));}labelTime=0;}
+
+ function syncPickerTrigger(){trigger.textContent=selected?pickerItemLabel(selected):PLACEHOLDER;trigger.classList.toggle('is-placeholder',!selected);}
+ function closePicker(){if(!pickerOpen)return;pickerOpen=false;pickerPanel.hidden=true;trigger.setAttribute('aria-expanded','false');search.value='';pickerQuery='';}
+ function renderPickerList(){
+  const filtered=filterPickerItems(items,pickerQuery);pickerList.replaceChildren();
+  if(!String(pickerQuery||'').trim()){
+   const clear=document.createElement('button');clear.type='button';clear.className='jb-picker-option'+(selected?'':' chosen');clear.setAttribute('role','option');clear.setAttribute('aria-selected',String(!selected));clear.dataset.id='';
+   clear.innerHTML='<span class="jb-picker-text">'+PLACEHOLDER+'</span><span class="jb-picker-radio" aria-hidden="true"></span>';
+   clear.onclick=()=>{inspect('',true);closePicker();};pickerList.append(clear);
+  }
+  for(const n of filtered){
+   const option=document.createElement('button');option.type='button';option.className='jb-picker-option'+(n===selected?' chosen':'');option.setAttribute('role','option');option.setAttribute('aria-selected',String(n===selected));option.dataset.id=n.id;
+   option.innerHTML='<span class="jb-picker-text"></span><span class="jb-picker-radio" aria-hidden="true"></span>';option.querySelector('.jb-picker-text').textContent=pickerItemLabel(n);
+   option.onclick=()=>{inspect(n.id,true);closePicker();};pickerList.append(option);
+  }
+  const noMatches=!filtered.length&&!!String(pickerQuery||'').trim();
+  pickerEmpty.hidden=!noMatches;
+ }
+
+ function openPicker(){pickerOpen=true;pickerPanel.hidden=false;trigger.setAttribute('aria-expanded','true');renderPickerList();queueMicrotask(()=>search.focus());}
+ function inspect(id,focus=false){selected=items.find(n=>n.id===id)||null;syncPickerTrigger();if(pickerOpen)renderPickerList();refreshInspector();if(selected&&focus){const p=new THREE.Vector3(...selected.position);controls.target.copy(p);camera.position.copy(p).add(new THREE.Vector3(0,.15,3.1));}labelTime=0;}
  function rebuildActivation(){
   if(!activeLines)return;const nodes=new Set(trace?.activated?.map(n=>n.id)||[]),paths=new Set(trace?.pathways?.map(p=>p.id)||[]);
   activeEdges=edges.filter(e=>e.type==='route'?paths.has(e.path)&&nodes.has(e.b)&&(nodes.has(e.a)||e.a===e.path):trace?.pathways?.some(p=>p.id===e.b&&p.from===e.a||p.id===e.a&&p.from===e.b));
@@ -37,12 +58,12 @@ export function createJsonBrain({context='interview'}={}){
  }
  function activate(value,{at=clock,recorded=false}={}){trace=value;started=at;status.textContent=value?.pathways?.length?(recorded?'RECORDED RECALL':context==='explorer'?'MEMORY ACCESS':'LIVE RECALL')+' · '+value.pathways.map(p=>p.id).join(' → '):'Idle · pathways ready';rebuildActivation();refreshInspector();labelTime=0;}
  function setMemory(value,{subscribe=true}={}){
-  unsubscribe?.();unsubscribe=null;clearGraph();memory=value;selected=null;inspector.hidden=true;tabs.hidden=true;select.replaceChildren(new Option('Select a memory or pathway',''));trace=null;
+  unsubscribe?.();unsubscribe=null;clearGraph();memory=value;selected=null;inspector.hidden=true;tabs.hidden=true;closePicker();syncPickerTrigger();trace=null;
   if(!memory){status.textContent='Waiting for memory chip';return;}
   const layout=networkLayout(memory.graph);items=layout.items.map((n,index)=>({...n,index,jsonString:JSON.stringify(n.json),color:new THREE.Color(palette[n.region]),size:n.type==='pathway'?.135:.075}));
   const lookup=new Map(items.map(n=>[n.id,n]));panel.querySelector('.jb-count').textContent=memory.graph.nodes.length+' memories / '+memory.graph.pathways.length+' paths';
   const positions=new Float32Array(items.length*3);pointColors=new Float32Array(items.length*3);pointSizes=new Float32Array(items.length);
-  for(const n of items){positions.set(n.position,n.index*3);n.color.toArray(pointColors,n.index*3);pointSizes[n.index]=n.size;select.append(new Option(n.id+' · '+(n.json.label||n.json.fact),n.id));}
+  for(const n of items){positions.set(n.position,n.index*3);n.color.toArray(pointColors,n.index*3);pointSizes[n.index]=n.size;}
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));geometry.setAttribute('aColor',new THREE.BufferAttribute(pointColors,3));geometry.setAttribute('aSize',new THREE.BufferAttribute(pointSizes,1));points=new THREE.Points(geometry,nodeMaterial);group.add(points);
   const linePositions=[],lineColors=[];
   for(const edge of layout.edges){const a=lookup.get(edge.a),b=lookup.get(edge.b);if(!a||!b)continue;const av=new THREE.Vector3(...a.position),bv=new THREE.Vector3(...b.position),mid=av.clone().lerp(bv,.5);mid.z+=Math.min(.28,av.distanceTo(bv)*.07);const curve=new THREE.QuadraticBezierCurve3(av,mid,bv),vertices=curve.getPoints(5),color=a.color.clone().lerp(b.color,.5).multiplyScalar(.65);edges.push({...edge,curve,vertices});for(let j=0;j<vertices.length-1;j++){linePositions.push(...vertices[j].toArray(),...vertices[j+1].toArray());lineColors.push(...color.toArray(),...color.toArray());}}
@@ -69,9 +90,9 @@ export function createJsonBrain({context='interview'}={}){
   renderer.render(scene,camera);labels.render(scene,camera);
  }
  let down=null;renderer.domElement.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];});renderer.domElement.addEventListener('pointerup',e=>{if(!points||!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>5)return;const r=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);raycaster.params.Points.threshold=Math.max(.06,camera.position.distanceTo(controls.target)*.009);raycaster.setFromCamera(pointer,camera);const hit=raycaster.intersectObject(points)[0];if(hit)inspect(items[hit.index].id,true);});
- select.onchange=()=>inspect(select.value,true);
+ trigger.onclick=()=>{if(pickerOpen)closePicker();else openPicker();}; search.oninput=()=>{pickerQuery=search.value;renderPickerList();}; search.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closePicker();trigger.focus();}}; const onPickerPointer=e=>{if(pickerOpen&&!picker.contains(e.target))closePicker();}; document.addEventListener('pointerdown',onPickerPointer);
  const [pan,plus,minus,reset,detail]=panel.querySelector('.jb-tools').querySelectorAll('button');pan.onclick=()=>{const on=pan.getAttribute('aria-pressed')!=='true';pan.setAttribute('aria-pressed',String(on));controls.mouseButtons.LEFT=on?THREE.MOUSE.PAN:THREE.MOUSE.ROTATE;};
  plus.onclick=()=>camera.position.sub(controls.target).multiplyScalar(.75).add(controls.target);minus.onclick=()=>camera.position.sub(controls.target).multiplyScalar(1.3).add(controls.target);reset.onclick=()=>{camera.position.set(-.4,.6,8.8);controls.target.set(0,-.3,0);labelTime=0;};detail.setAttribute('aria-pressed',String(highDetail));detail.onclick=()=>{highDetail=!highDetail;detail.setAttribute('aria-pressed',String(highDetail));};
  for(const button of tabs.querySelectorAll('button'))button.onclick=()=>{inspectorTab=button.dataset.tab;tabs.querySelectorAll('button').forEach(b=>b.classList.toggle('chosen',b===button));refreshInspector();};
- return {panel,setMemory,activate,inspect,showEvidence(ids,options){activate(memory?evidenceTrace(memory.graph,ids):null,options);},update,get trace(){return trace;},dispose(){unsubscribe?.();observer.disconnect();pulses?.userData.texture?.dispose();clearGraph();controls.dispose();nodeMaterial.dispose();renderer.dispose();panel.remove();}};
+ return {panel,setMemory,activate,inspect,showEvidence(ids,options){activate(memory?evidenceTrace(memory.graph,ids):null,options);},update,get trace(){return trace;},dispose(){unsubscribe?.();observer.disconnect();document.removeEventListener('pointerdown',onPickerPointer);closePicker();pulses?.userData.texture?.dispose();clearGraph();controls.dispose();nodeMaterial.dispose();renderer.dispose();panel.remove();}};
 }
