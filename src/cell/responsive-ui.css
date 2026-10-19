@@ -37,7 +37,10 @@ body:not(.feed-started) .json-brain[data-context=cell]{visibility:hidden}
  .json-brain[data-context=cell] .jb-tools{flex-wrap:wrap}
  .json-brain[data-context=cell] .jb-count{display:none}
  #bottom{left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:calc(8px + env(safe-area-inset-bottom) + var(--ui-bottom,0px));gap:5px;z-index:3;max-height:45dvh;overflow:auto;overscroll-behavior:contain}
- #thought-row{font-size:11px;max-height:50px;overflow:auto}
+ /* Stack the label above the thought; centered flex children clipped the top of long thoughts out of scroll reach. */
+ #bottom>#thought-row{display:flex;flex-direction:column;align-items:stretch;gap:3px;font-size:12px;line-height:1.4;max-height:none;overflow:visible;padding:6px 10px}
+ #bottom>#thought-row b{margin:0}
+ #bottom>#thought-row #thought{max-height:calc(1.4em * 3);overflow-y:auto;overscroll-behavior:contain;overflow-wrap:anywhere}
  #dialogue{padding:8px 10px;max-height:120px;overflow:auto}
  #dialogue p{font-size:14px}
  #ask{font-size:16px;min-height:44px;width:0;padding:8px}

@@ -55,3 +55,23 @@ test('desktop panels minimize independently and JSON Brain moves by its title ba
  await page.keyboard.press('Home');
  await expect(brain).not.toHaveClass(/panel-positioned/);
 });
+test('phone thought row keeps the start of long thoughts visible',async({page})=>{
+ test.setTimeout(240_000);
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('/');
+ await page.locator('#go').click({force:true});
+ const long='and i feel the mild ache in my chassis as i stand here holding this book, the quiet of the room suddenly broken by the crackle of the intercom. it is a simple greeting, but it provides a point of contact in the isolation.';
+ await page.evaluate(text=>{document.getElementById('thought').textContent=text;},long);
+ const box=await page.evaluate(()=>{
+  const row=document.getElementById('thought-row').getBoundingClientRect();
+  const label=document.querySelector('#thought-row b').getBoundingClientRect();
+  const thought=document.getElementById('thought');
+  const t=thought.getBoundingClientRect();
+  return {rowTop:row.top,labelBottom:label.bottom,thoughtTop:t.top,scrollTop:thought.scrollTop,scrollable:thought.scrollHeight>thought.clientHeight};
+ });
+ // The label sits above the text and the first line is not clipped above the row.
+ expect(box.thoughtTop).toBeGreaterThanOrEqual(box.rowTop);
+ expect(box.thoughtTop).toBeGreaterThanOrEqual(box.labelBottom-1);
+ expect(box.scrollTop).toBe(0);
+ expect(box.scrollable).toBe(true);
+});
