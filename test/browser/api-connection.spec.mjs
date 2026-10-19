@@ -5,7 +5,7 @@ import {sceneProxy,llmProxy} from '../../tools/scene-proxy.mjs';
 import {apiConfiguration,createApiServer} from '../../tools/api-server.mjs';
 
 test('private scene settings discover and switch models without env configuration',async({page,baseURL})=>{
- test.setTimeout(180_000);
+ test.setTimeout(360_000); // Two model-fetch rounds under software-rendered CI can exceed 180s.
  const origin='http://cell.test',key='mock-private-scene-fixture',calls=[],errors=[];
  const server=createApiServer(apiConfiguration({}),{
   fetcher:async(endpoint,options)=>{
