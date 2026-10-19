@@ -845,6 +845,40 @@ export function createActions(world, body, cb) {
       body.clearGesture();
     }
   }
+  async function mcpAction(a) {
+    const token = tok;
+    if (!cb.mcp) return unavailable('MCP is not connected to this computer.');
+    await atDesk();
+    if (body.st.posture !== 'sit' || body.st.seat !== SEATS.stool)
+      return blocked('You must be seated at the computer to access MCP.');
+    if (token?.cancelled || token?.signal?.aborted) throw INTERRUPT;
+    body.gesture('type', 999, true);
+    try {
+      const result = await cb.mcp(a, {signal: token?.signal});
+      if (token?.cancelled || token?.signal?.aborted) throw INTERRUPT;
+      if (body.st.posture !== 'sit' || body.st.seat !== SEATS.stool)
+        return blocked('You left the computer before MCP data arrived.');
+      const text =
+        'MCP external data from ' +
+        result.source +
+        ': ' +
+        result.text +
+        (result.truncated ? ' [truncated]' : '');
+      world.crt?.set('note', {title: 'MCP · ' + result.source, text: result.text});
+      // Reuse the host's completed-observation path to report the actual result.
+      if (token)
+        token.observation = {
+          source: 'mcp',
+          catalog: (a.op || 'list') === 'list',
+          target: 'computer MCP',
+          text,
+          capturedAt: Date.now(),
+        };
+      return text;
+    } finally {
+      if (tok === token) body.clearGesture();
+    }
+  }
   async function codeApp(a) {
     const pc = cb.computer;
     let name = String(a.app || a.name || a.title || '')
@@ -1303,6 +1337,8 @@ export function createActions(world, body, cb) {
       case 'browser':
       case 'slopcannon':
         return browserAction(a);
+      case 'mcp':
+        return mcpAction(a);
       case 'note':
       case 'write_note':
       case 'journal':

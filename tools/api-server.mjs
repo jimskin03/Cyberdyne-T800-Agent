@@ -8,14 +8,16 @@ import {createConnectionState} from './api/connection-state.mjs';
 import {validateChatRequest} from './api/request-validation.mjs';
 import {requestUpstream} from './api/upstream.mjs';
 import {requestModels} from './api/models.mjs';
+import {createMcpGateway, McpError} from './mcp/gateway.mjs';
 
 export {agentLabel,apiConfiguration,operatorConnection} from './api/config.mjs';
 
-export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcurrent=3,oauthOptions={}}={}){
+export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcurrent=3,oauthOptions={},mcpOptions={}}={}){
  let active=0;
  const oauth=config.authMode==='oauth'&&config.oauth?createOAuth(config.oauth,{fetcher,...oauthOptions}):null;
  const connections=createConnectionState(config,oauth);
- return http.createServer(async(req,res)=>{
+ const mcp=createMcpGateway({fetcher,...mcpOptions});
+ const server=http.createServer(async(req,res)=>{
   const send=(status,value)=>sendJson(res,status,value);
   const pathname=(req.url||'').split('?')[0];
   // Authorization servers return a cross-site browser navigation. Only this route
@@ -30,6 +32,20 @@ export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcur
    return;
   }
   if(!guardLocalRequest(req,res,{allowedOrigins:config.allowedOrigins||[]}))return;
+  if(req.method==='GET'&&pathname==='/mcp')return send(200,mcp.status());
+  if(req.method==='POST'&&['/mcp/connection','/mcp/action'].includes(pathname)){
+   if(active>=maxConcurrent)return send(429,{error:'Adapter is busy. Retry later.'});
+   active++;
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.min(timeoutMs,20000));
+   const cancel=()=>{if(!res.writableEnded)controller.abort();};res.on('close',cancel);
+   try{
+    const body=await readJson(req,{limit:32*1024}).catch(error=>{if(error.status===400||error.status===413)throw new McpError(error.status,error.status===413?'MCP request is too large.':'Invalid MCP request JSON.');throw error;});
+    if(pathname==='/mcp/action')return send(200,await mcp.execute(body,{signal:controller.signal}));
+    if(body?.kind==='disconnect'){await mcp.disconnect();return send(200,mcp.status());}
+    return send(200,await mcp.connect(body,{signal:controller.signal,localPort:req.socket.localPort}));
+   }catch(error){return send(error instanceof McpError?error.status:controller.signal.aborted?504:502,{error:error instanceof McpError?error.message:controller.signal.aborted?'MCP request timed out.':'MCP request failed. Check the URL, bearer token and server capabilities.'});}
+   finally{clearTimeout(timer);res.off('close',cancel);active--;}
+  }
   if(req.method==='GET'&&req.url==='/health')return send(200,connections.health(connections.current()));
   if(req.method==='GET'&&pathname==='/connection')return send(200,{settings:connections.settings(connections.current())});
   if(req.method==='POST'&&pathname==='/connection/models'){
@@ -73,6 +89,8 @@ export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcur
   }catch(error){send(error.status||(controller.signal.aborted?504:502),{error:error.status?error.message:controller.signal.aborted?'Provider request timed out.':'API adapter request failed.',...(!error.status?{code:controller.signal.aborted?'provider_timeout':'provider_request_failed'}:{})});}
   finally{clearTimeout(timer);res.off('close',cancel);active--;}
  });
+ server.on('close',()=>{void mcp.disconnect();});
+ return server;
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{

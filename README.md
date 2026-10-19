@@ -26,7 +26,7 @@ The offline scene also supports ordinary HTTP origins when hosted on another dev
 ## Using the interface
 
 - **Desktop:** the **−** button on JSON Brain, Mind Stream, Thoughts, or Dialogue minimizes that panel independently, leaving its title or label visible; **+** restores it. Minimizing keeps the conversation, settings, and memory selection, and the intercom stays available. To move the JSON Brain box, drag its title bar (no hold needed; the minimize button stays clickable). You can also focus the title bar and use the arrow keys, or press **Home** to reset its position.
-- **Phones and short landscape screens:** **Controls** opens the operator settings, including **AI mind**, and **Memory** opens the interactive JSON brain. Each panel scrolls and has a **Close** button (Escape also closes it). Selecting a tool closes Controls so you can tap the unit.
+- **Phones and short landscape screens:** **Controls** opens the physical operator controls, and **Memory** opens the interactive JSON brain. **Settings** in the top bar opens the Mind and MCP tabs on every screen size. Each panel scrolls and has a **Close** button (Escape also closes it). Selecting a tool closes Controls so you can tap the unit.
 - **Keyboard:** 1–8 arm a tool, G grapple, C his computer, V swap POV, P punk, B baby, M mute, H hide UI.
 
 ## Commands
@@ -84,7 +84,7 @@ npm run brain:validate -- examples/brain.starter.json "repair radio"
 ## Connecting an AI mind (optional)
 
 1. Run `npm run api` in a second terminal. It starts without a `.env` file and keeps API keys in backend memory.
-2. Run `npm run dev`, open the scene, and select **OpenAI-compatible API** in the MIND controls (inside **Controls** on phones).
+2. Run `npm run dev`, open the scene, and select **OpenAI-compatible API** under **Settings → Mind**.
 3. Enter the base URL and API key, or leave the key blank for an unauthenticated local server. Select **Fetch models**, choose a chat-capable model, then **Use API**. You can also type a model ID directly.
 4. Reopen the same settings to change the endpoint, name, key, text model, or vision model while the server is running. **Use saved key** lets you change models without entering the key again. Changes take effect for new requests.
 
@@ -94,6 +94,14 @@ A static deployment (`dist/` on any web server) has no `/llm` backend, so the sc
 If the character does not answer, check the status below the chat input: **AI off** means AI mind is not selected, and **AI unavailable** means the backend is not reachable. Background thinking defaults to once every 30 wall-clock seconds, and direct questions take priority.
 
 When opening the scene over Tailscale or a private network, run the API backend on the scene-server machine. The included dev and preview proxies accept settings from the scene's current address and port without an `.env` origin setting. See [private network setup and connection errors](docs/API-INTEGRATION.md#using-the-scene-over-tailscale-or-another-private-network).
+
+## MCP outside data through the computer
+
+Open **Settings → MCP**, enter a Streamable HTTP MCP server URL and optional bearer token, then select **Connect MCP**. The backend keeps the token in memory; disconnect or restart clears the connection. The panel lists the available resources and identifies which tools advertise read-only access.
+
+The unit must sit at its computer before it can retrieve outside data. Say **list MCP sources** to have it approach the stool, sit, and list the connected sources, or ask a connected mind to use a listed tool or resource. Results appear on its CRT and in **His computer → MCP data**. Opening the remote computer viewer does not grant the unit access while it is elsewhere.
+
+This supports one server, text resources, and tools marked read-only. See [MCP setup and limits](docs/MCP.md) for the action contract, authentication and supported transport.
 
 ## Continuous integration
 

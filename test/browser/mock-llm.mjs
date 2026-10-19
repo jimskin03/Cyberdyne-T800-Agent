@@ -50,6 +50,7 @@ const health=()=>connected?{
 const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,'http://127.0.0.1:18081');
   if(req.method==='GET'&&url.pathname==='/health')return json(res,200,health());
+  if(req.method==='GET'&&url.pathname==='/mcp')return json(res,200,{connected:false,name:'',url:'',tools:[],resources:[]});
   if(req.method==='GET'&&url.pathname==='/connection')return json(res,200,{settings:{}});
   if(req.method==='POST'&&url.pathname==='/connection'){
     const data=await body(req);connectionCalls++;

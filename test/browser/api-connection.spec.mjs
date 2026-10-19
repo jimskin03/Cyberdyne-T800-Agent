@@ -38,6 +38,7 @@ test('private scene settings discover and switch models without env configuratio
   await page.waitForFunction(()=>window.__CELL?.world);
   await page.locator('#go').click();
   await expect(page.locator('#start')).toHaveClass(/gone/);
+  await page.locator('#settings-toggle').click();
   await page.locator('#openai-api-toggle').click();
   await page.locator('#openai-base').fill('https://openrouter.ai/api/v1');
   await page.locator('#openai-model').fill('openrouter/free');
@@ -129,7 +130,7 @@ test('phone chat shows provider failure after model discovery and recovers on th
   await page.goto('/');
   await page.waitForFunction(()=>window.__CELL?.world);
   await page.locator('#go').click();
-  await page.locator('#controls-toggle').click();
+  await page.locator('#settings-toggle').click();
   await page.locator('#openai-api-toggle').click();
   await page.locator('#openai-base').fill('https://openrouter.ai/api/v1');
   await page.locator('#openai-key').fill(key);
@@ -138,7 +139,7 @@ test('phone chat shows provider failure after model discovery and recovers on th
   await page.locator('#openai-model-options').selectOption('unit-model');
   await page.locator('#openai-model').press('Enter');
   await expect(page.locator('#use-brain')).toBeChecked();
-  await page.locator('#lab .mobile-panel-close').click();
+  await page.locator('#settings-close').click();
   await page.locator('#ask').fill('Hello, issue 40 greeting');
   await page.locator('#ask').press('Enter');
   await expect(page.locator('#reply-status')).toContainText('insufficient credits or quota',{timeout:45_000});

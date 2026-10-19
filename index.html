@@ -5,7 +5,7 @@
 <main id="world" aria-label="T-800 loose in a containment cell"></main>
 <div class="vignette"></div><div class="film-grain"></div>
 <header><div class="eyebrow"><i class="live"></i> CYBERDYNE CONTAINMENT / CELL 7 / LIVE</div><h1><b data-agent-name>Agent</b><span>CONTAINMENT CELL</span></h1><div class="sub">No restraints. Your agent in a containment cell. Intercom orders take priority.</div></header>
-<div class="topline"><span id="clock">08:10</span><span id="air" class="on">ON AIR 00:00:00</span><span id="brain-status" class="off">MIND …</span><span><b id="hits">0</b> STRIKES</span><button id="sound">Sound off ♪</button><button id="pc-btn" class="pcbtn">His computer <b id="pc-count"></b> <kbd>C</kbd></button></div>
+<div class="topline"><span id="clock">08:10</span><span id="air" class="on">ON AIR 00:00:00</span><span id="brain-status" class="off">MIND …</span><span><b id="hits">0</b> STRIKES</span><button id="sound">Sound off ♪</button><button id="pc-btn" class="pcbtn">His computer <b id="pc-count"></b> <kbd>C</kbd></button><button id="settings-toggle" type="button" aria-haspopup="dialog" aria-controls="settings" aria-expanded="false">Settings</button></div>
 <nav id="mobile-panels" aria-label="Scene panels"><button id="controls-toggle" aria-controls="lab" aria-expanded="false">Controls</button><button id="memory-toggle" aria-controls="cell-memory" aria-expanded="false">Memory</button></nav>
 
 
@@ -47,6 +47,17 @@
  <div class="control-row"><button id="punk" class="noise">Punk music</button><button id="baby" class="noise">Baby crying</button></div>
  <label class="slide">Volume <output id="noisevol-v"></output><input id="noisevol" type="range" min="0.1" max="1" step="0.05"></label>
  <div class="divider"></div>
+ <button id="photo-art">Photograph wall art</button>
+ <button id="hide">H / Hide UI</button>
+</aside>
+
+<dialog id="settings" aria-labelledby="settings-title">
+ <div class="settings-heading"><h2 id="settings-title">Settings</h2><button id="settings-close" type="button" autofocus>Close</button></div>
+ <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+  <button id="settings-mind-tab" type="button" role="tab" aria-controls="mind-settings" aria-selected="true">Mind</button>
+  <button id="settings-mcp-tab" type="button" role="tab" aria-controls="mcp-settings" aria-selected="false" tabindex="-1">MCP</button>
+ </div>
+ <section id="mind-settings" role="tabpanel" aria-labelledby="settings-mind-tab">
  <div class="section-label">MIND</div>
  <div class="agent-connection"><span id="agent-connection-state">No agent connected</span>
   <div class="agent-options"><button id="openai-api-toggle" type="button" aria-expanded="false" aria-controls="openai-api-form">OpenAI-compatible API</button><button id="invite-agent-toggle" type="button" aria-expanded="false" aria-controls="invite-agent-form">Invite agent</button></div>
@@ -86,9 +97,22 @@
  <label class="check"><input id="heart-snd" type="checkbox" checked> Heartbeat sound</label>
  <label class="rowlabel">Clock <select id="timescale"><option value="1">real time</option><option value="10">1 min = 10 min</option><option value="60">1 min = 1 hour</option></select></label>
  <label class="rowlabel">Voice <select id="voice-sel"><option>loading…</option></select></label>
- <button id="photo-art">Photograph wall art</button>
- <div class="control-row" style="margin-top:10px"><button id="forget">Wipe memory</button><button id="hide">H / Hide UI</button></div>
-</aside>
+ <div class="control-row" style="margin-top:10px"><button id="forget">Wipe memory</button></div>
+ </section>
+ <section id="mcp-settings" role="tabpanel" aria-labelledby="settings-mcp-tab" hidden>
+  <h3>Computer connections</h3>
+  <p class="hint">Connect an MCP server for outside data. The unit must sit at its computer to discover data sources or retrieve results. Ask the unit to “list MCP sources” to discover data. Opening His computer as an operator does not seat the unit.</p>
+  <form id="mcp-form" class="agent-form" autocomplete="off">
+   <label class="rowlabel">Server name <input id="mcp-name" type="text" maxlength="80" placeholder="MCP server"></label>
+   <label class="rowlabel">MCP URL <input id="mcp-url" type="url" required autocomplete="off" spellcheck="false" placeholder="https://your-server.example/mcp"></label>
+   <label class="rowlabel">Bearer token <input id="mcp-token" type="password" autocomplete="off" spellcheck="false" placeholder="optional"></label>
+   <p class="hint">Streamable HTTP servers are supported. Tokens stay on the backend until disconnect or restart. Use HTTPS, or HTTP for a server on this computer.</p>
+   <div class="control-row"><button type="submit">Connect MCP</button><button id="mcp-disconnect" type="button" hidden>Disconnect MCP</button></div>
+  </form>
+  <p id="mcp-status" class="hint" role="status">MCP disconnected.</p>
+  <div id="mcp-catalog"></div>
+ </section>
+</dialog>
 
 <aside id="mindpanel" aria-label="His mind"><div class="panel-title"><span>MIND STREAM</span><span id="thinking"><i></i><i></i><i></i> thinking</span></div>
  <div id="mind"></div>
@@ -102,7 +126,7 @@
 </div>
 <footer><span>G grapple ? grab, drag and release to toss ? Drag to orbit · Scroll to zoom · Click POV / V to swap · 1–8 arm a tool, click him · P punk · B baby · C his computer · M mute · H hide UI</span></footer>
 <button id="restore-ui" hidden>Show interface · H</button>
-<div id="start" role="dialog" aria-modal="true" aria-labelledby="start-title"><div class="card"><div class="eyebrow">CYBERDYNE CONTAINMENT · CELL 7</div><h2 id="start-title">Unit T-800 is loose in his cell.</h2><p>No chair, no straps. He walks, looks out of the window, picks things up, reads, writes on the wall. The default JSON brain supplies an authored history and experience-driven behavior. From MIND, add an OpenAI-compatible API or invite another agent. A configured API or OAuth backend still works. Direct intercom commands take priority.</p><p>The tool arm in the ceiling only moves when <b>you</b> pick a tool and click on him.</p><button id="go" class="primary">Open the feed <span>→</span></button></div></div>
+<div id="start" role="dialog" aria-modal="true" aria-labelledby="start-title"><div class="card"><div class="eyebrow">CYBERDYNE CONTAINMENT · CELL 7</div><h2 id="start-title">Unit T-800 is loose in his cell.</h2><p>No chair, no straps. He walks, looks out of the window, picks things up, reads, writes on the wall. The default JSON brain supplies an authored history and experience-driven behavior. From Settings → Mind, add an OpenAI-compatible API or invite another agent. A configured API or OAuth backend still works. Direct intercom commands take priority.</p><p>The tool arm in the ceiling only moves when <b>you</b> pick a tool and click on him.</p><button id="go" class="primary">Open the feed <span>→</span></button></div></div>
 <div id="pc" hidden role="dialog" aria-label="His computer"><div class="pc-crt">
  <div class="pc-bar"><b>T-OS 0.8</b><span>UNIT T-800 · REMOTE SESSION</span><button id="pc-close">✕ close <kbd>C</kbd></button></div>
  <div id="pc-icons"></div>

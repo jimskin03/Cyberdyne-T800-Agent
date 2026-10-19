@@ -49,6 +49,7 @@ export function spokenGoal(text){
 }
 export function actionKey(action){
  const do_=String(action?.do||action?.action||'').toLowerCase().replace(/ /g,'_');
+ if(do_==='mcp')return 'mcp:'+JSON.stringify([action.op||'list',action.tool||'',action.uri||'',action.arguments||{}]);
  const target=action?.target??action?.object??action?.on??'';
  const place=Array.isArray(target)?target.map(n=>Math.round(Number(n)*2)/2).join(','):normalizedLine(target).replace(/ /g,'_');
  // These aliases really enter the same Slopcannon handler. Group access failures

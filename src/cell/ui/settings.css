@@ -1,0 +1,125 @@
+#settings {
+  width: min(600px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  padding: 20px;
+  background: #0c171f;
+  color: #eaeef0;
+  border: 1px solid #4cf2ff66;
+  border-radius: 12px;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+#settings::backdrop {
+  background: #020609c9;
+  backdrop-filter: blur(4px);
+}
+.settings-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #0c171f;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.settings-heading h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.settings-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.settings-tabs button {
+  flex: 1;
+}
+.settings-tabs [aria-selected='true'] {
+  border-color: var(--cy);
+  color: var(--cy);
+  background: #133039;
+}
+#settings [role='tabpanel'][hidden] {
+  display: none;
+}
+#settings button,
+#settings select {
+  min-height: 40px;
+  font-size: 12px;
+}
+#settings .section-label,
+#settings h3 {
+  font: 700 13px var(--mono);
+  margin: 16px 0 10px;
+}
+#settings .hint {
+  font-size: 12px;
+  line-height: 1.6;
+}
+#settings .rowlabel,
+#settings .check,
+#settings .slide {
+  font-size: 12px;
+  line-height: 1.5;
+}
+#settings .rowlabel {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+#settings input:not([type='checkbox']):not([type='range']) {
+  min-height: 40px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+#settings input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+#settings input[type='range'] {
+  min-height: 32px;
+  width: 100%;
+}
+#settings .agent-options {
+  grid-template-columns: 1fr 1fr;
+}
+#settings .agent-connection {
+  font-size: 12px;
+}
+#settings .control-row {
+  flex-wrap: wrap;
+}
+#settings .agent-form {
+  gap: 10px;
+}
+#settings label {
+  overflow-wrap: anywhere;
+}
+#mcp-catalog {
+  font: 12px/1.6 var(--mono);
+  overflow-wrap: anywhere;
+}
+#mcp-catalog ul {
+  padding-left: 22px;
+}
+@media (max-width: 760px), (max-height: 500px) {
+  #settings {
+    position: fixed;
+    inset: max(10px, env(safe-area-inset-top)) 0 auto;
+    margin: 0 auto;
+    padding: 14px;
+    max-height: calc(100dvh - 20px - var(--ui-bottom, 0px));
+  }
+  #settings button {
+    min-height: 44px;
+  }
+  #settings input:not([type='checkbox']):not([type='range']),
+  #settings select {
+    font-size: 16px;
+  }
+  #settings .agent-options {
+    grid-template-columns: 1fr;
+  }
+}
