@@ -26,7 +26,8 @@ async function startFeed(page){
 }
 
 async function connectMockAgent(page){
-  await page.getByRole('button',{name:'Invite agent'}).click();
+  await page.locator('#settings-toggle').click();
+  await page.getByRole('button',{name:'Invite agent',exact:true}).click();
   await page.locator('#invite-name').fill('Mock T-800');
   await page.locator('#invite-base').fill('http://127.0.0.1:9999/v1');
   await page.locator('#invite-model').fill('mock-model');
@@ -34,6 +35,7 @@ async function connectMockAgent(page){
   await page.locator('#invite-model').press('Enter');
   await expect(page.locator('#agent-connection-state')).toContainText('Mock T-800');
   await expect(page.locator('#use-brain')).toBeChecked();
+  await page.locator('#settings-close').click();
 }
 
 async function sendIntercom(page,text){
@@ -91,6 +93,7 @@ test('desktop startup, mocked connection, consecutive replies, fresh inspection 
   await page.keyboard.press('Escape');
   await expect(page.locator('#pc')).toBeHidden();
 
+  await page.locator('#settings-toggle').click();
   await page.locator('#agent-disconnect').click();
   await expect(page.locator('#use-brain')).not.toBeChecked();
   await expect(page.locator('#agent-connection-state')).toContainText('no API configured');
@@ -124,6 +127,7 @@ test('reset keeps one compatible undo slot and restores namespaced state',async(
   await openFresh(page,request);
   await page.evaluate(()=>localStorage.setItem('cell-public-test.marker','kept-for-undo'));
   await startFeed(page);
+  await page.locator('#settings-toggle').click();
   await Promise.all([page.waitForEvent('framenavigated'),page.locator('#forget').click()]);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(()=>window.__CELL?.world);
@@ -131,6 +135,7 @@ test('reset keeps one compatible undo slot and restores namespaced state',async(
   expect(await page.evaluate(()=>localStorage.getItem('cell-session-reset-backup.v1'))).not.toBeNull();
 
   await startFeed(page);
+  await page.locator('#settings-toggle').click();
   await Promise.all([page.waitForEvent('framenavigated'),page.getByRole('button',{name:'Restore previous session'}).click()]);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(()=>window.__CELL?.world);

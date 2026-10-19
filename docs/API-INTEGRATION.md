@@ -4,7 +4,7 @@ The scene has no required AI service or model. Give your agent a name and connec
 
 ## Configure the backend
 
-For interactive setup, run `npm run api` and `npm run dev`, then use the MIND panel below. No `.env` file is required.
+For interactive setup, run `npm run api` and `npm run dev`, then open **Settings → Mind**. No `.env` file is required.
 
 For optional startup defaults or OAuth registration, create an ignored local `.env` with the fields for your chosen service:
 
@@ -30,9 +30,9 @@ Run `npm run api` in one terminal and `npm run dev` in another. Open http://127.
 
 A blank API configuration — no base URL, model, key, or OAuth registration — still starts the adapter. It reports `status: "unconfigured"` until you connect from the scene or fill in `.env`.
 
-## Connect from the MIND panel
+## Connect from Settings → Mind
 
-With the adapter running, the **MIND** section offers two ways to connect without editing `.env`. On a phone, open **Controls** first.
+With the adapter running, the **MIND** section offers two ways to connect without editing `.env`. Select **Settings** in the top bar on desktop or phone, then choose **Mind**.
 
 - **OpenAI-compatible API** takes an agent name, base URL, optional API key, text model, and optional vision model. Leave the key blank for an unauthenticated server. The adapter appends `/chat/completions` (a pasted completions URL is accepted once) and keeps the key in process memory. The browser does not store the key, and health checks never return it.
 - **Invite agent** is for other alternatives: a local or HTTPS server with no key, a different API-key service, or the OAuth account already registered in `.env`. Sign-in does not accept a client-supplied token URL, client secret, or API key. Complete the popup when it opens.
@@ -162,6 +162,10 @@ If the agent does not answer, inspect the status below the chat input. Check tha
 Successful model discovery and a green connection status only confirm local configuration and model-list access. They do not verify chat access. Chat failures now identify authentication, billing/quota, permissions, unavailable models, rate limits, context/output limits, provider outages and content-policy refusals below the chat input. Update API settings or the provider account according to that message. Failed transport requests are not immediately repeated; a later question can try again.
 
 The adapter returns authored `{ "error": "safe explanation", "code": "provider_rate_limited" }` diagnostics with HTTP 502 for provider failures. It checks error envelopes even on HTTP 200, including errors attached to a completion choice, and rejects partial output marked as failed. Raw provider messages and metadata never reach the browser. Empty reasoning-only responses are not spoken answers; when the output budget is exhausted, select another chat model or adapt the backend's output/reasoning budget for your service. See [OpenRouter's error documentation](https://openrouter.ai/docs/api/reference/errors-and-debugging) for its error envelopes and reasoning-budget behavior.
+
+## MCP data connections
+
+**Settings → MCP** configures a separate data connection through the same local adapter. It does not replace the mind API or grant generated apps network access. See [MCP setup and the computer access boundary](MCP.md).
 
 ## Deployment
 

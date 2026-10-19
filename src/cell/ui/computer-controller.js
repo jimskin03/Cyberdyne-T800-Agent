@@ -2,6 +2,7 @@ export function createComputerController({
   document = globalThis.document,
   window = globalThis.window,
   computer,
+  mcp,
   slop,
   world,
   state,
@@ -16,11 +17,15 @@ export function createComputerController({
 } = {}) {
   const $ = (id) => document.getElementById(id);
   let openedAt = -1e9;
+  let currentFile = null;
 
   function render() {
     const box = $('pc-icons');
     box.innerHTML = '';
     const files = [
+      ...(mcp?.status.connected
+        ? [{kind: 'mcp', name: 'MCP data', sub: 'Outside data through this computer'}]
+        : []),
       ...computer
         .apps()
         .map((app) => ({kind: 'app', name: app.name, sub: 'v' + app.versions.length})),
@@ -38,13 +43,14 @@ export function createComputerController({
     for (const file of files) {
       const button = document.createElement('button');
       button.className = 'pc-icon ' + file.kind;
-      button.innerHTML = `<i>${file.kind === 'browser' ? 'WWW' : file.kind === 'app' ? '&lt;/&gt;' : 'TXT'}</i><span>${escapeHtml(file.name)}</span><small>${escapeHtml(file.sub)}</small>`;
+      button.innerHTML = `<i>${file.kind === 'mcp' ? 'MCP' : file.kind === 'browser' ? 'WWW' : file.kind === 'app' ? '&lt;/&gt;' : 'TXT'}</i><span>${escapeHtml(file.name)}</span><small>${escapeHtml(file.sub)}</small>`;
       button.onclick = () => open(file);
       box.appendChild(button);
     }
   }
 
   function open(file) {
+    currentFile = file;
     const win = $('pc-win');
     const body = $('pc-win-body');
     $('pc-win-title').textContent = file.name;
@@ -52,6 +58,23 @@ export function createComputerController({
     $('pc-ver').hidden = file.kind !== 'app';
     $('pc-dl').hidden = file.kind !== 'app';
     body.innerHTML = '';
+
+    if (file.kind === 'mcp') {
+      const pre = document.createElement('pre');
+      pre.textContent = mcp.last
+        ? 'External data from ' +
+          mcp.last.source +
+          '\nRetrieved: ' +
+          mcp.last.at +
+          '\n' +
+          mcp.last.text +
+          (mcp.last.truncated ? '\n[truncated]' : '')
+        : 'No MCP data retrieved yet. Ask the unit to "list MCP sources"; it will go to the computer to discover data.';
+      body.appendChild(pre);
+      $('pc-sum').textContent =
+        'MCP data viewer. Opening this window does not retrieve outside data or seat the unit.';
+      return;
+    }
 
     if (file.kind === 'browser') {
       mountSlop(body, slop);
@@ -135,6 +158,7 @@ export function createComputerController({
       render();
       $('pc-win').hidden = true;
     } else {
+      currentFile = null;
       $('pc-win-body').innerHTML = '';
       if (state.started) world.crt.set('desktop', {list: computer.files()});
     }
@@ -143,6 +167,7 @@ export function createComputerController({
   $('pc-btn').onclick = () => toggle();
   $('pc-close').onclick = () => toggle(false);
   $('pc-win-close').onclick = () => {
+    currentFile = null;
     $('pc-win').hidden = true;
     $('pc-win-body').innerHTML = '';
   };
@@ -169,5 +194,16 @@ export function createComputerController({
   });
 
   world.crt.set('desktop', {list: computer.files()});
-  return {render, open, toggle};
+  const unsubscribe = mcp?.subscribe(() => {
+    if (!$('pc').hidden) render();
+    if (currentFile?.kind === 'mcp' && !$('pc').hidden && !$('pc-win').hidden) open(currentFile);
+  });
+  return {
+    render,
+    open,
+    toggle,
+    destroy() {
+      unsubscribe?.();
+    },
+  };
 }

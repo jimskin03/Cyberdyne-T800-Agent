@@ -36,6 +36,9 @@ import {createConnectionController} from './ui/connection-controller.js';
 import {createIntercomController} from './ui/intercom-controller.js';
 import {createHudController} from './ui/hud-controller.js';
 import {createComputerController} from './ui/computer-controller.js';
+import {createSettingsController} from './ui/settings-controller.js';
+import {createMcpController} from './ui/mcp-controller.js';
+import {createMcpClient} from './mcp-client.js';
 import {createSpeechCoordinator} from './app/speech-coordinator.js';
 import {createActionQueue} from './app/action-queue.js';
 import {createThoughtScheduler} from './app/thought-scheduler.js';
@@ -233,6 +236,10 @@ const thoughtClock = createThoughtClock();
 const mind = createMind({enabled: aiEnabled});
 $('use-brain').checked = aiEnabled;
 const computer = createComputer();
+const mcp = createMcpClient({
+  isAtComputer: () =>
+    !!body && !!actions && body.st.posture === 'sit' && body.st.seat === actions.SEATS.stool,
+});
 const slop = createSlop();
 let world, body, actions, grapple, waterMode, peace, climate, berserker;
 const inPeace = () => !!peace?.active;
@@ -366,6 +373,7 @@ try {
           : `(studying the surface, planning a drawing: ${subj})`,
       ),
     computer,
+    mcp: (action, options) => mcp.execute(action, options),
     coder: async (q) => {
       $('doing').textContent = `programming ${q.name || 'a new app'} (Vision model)…`;
       const signal = q.token?.signal;
@@ -603,6 +611,8 @@ function addEvent(kind, text, urgent = false) {
   if (urgent) thinkNow(kind === 'intercom');
 }
 const actText = (a) => {
+  if (a.do === 'mcp')
+    return 'mcp ' + (a.op || 'list') + (a.tool ? ' ' + a.tool : a.uri ? ' ' + a.uri : '');
   const d = String(a.do || a.action || '?').replace(/_/g, ' ');
   const o = a.object || a.target || a.on || '';
   const extra = a.text
@@ -696,6 +706,12 @@ function senses() {
       },
       {name: 'Session memory', text: sessionMemory.prompt(), priority: 55, maxChars: 1600},
       {name: 'Computer files', text: computer.summary(), priority: 50, maxChars: 800},
+      {
+        name: 'Computer MCP connection and external data',
+        text: mcp.context(),
+        priority: 70,
+        maxChars: 5000,
+      },
       {name: 'Notes', text: variedMemory(state.notes).join('\n'), priority: 45, maxChars: 1200},
       {
         name: 'Actual artwork',
@@ -902,6 +918,7 @@ async function think() {
         browserWaiting: !!browserState?.waiting,
         browserRequested,
         atComputer,
+        mcpConnected: mcp.status.connected,
         canCheckBrowser:
           !browserState?.waiting && Date.now() - (state.lastBrowserCheck || 0) > 30000,
       },
@@ -1283,6 +1300,23 @@ const connectionUI = createConnectionController({
   actions,
   toast,
 });
+const mcpUI = createMcpController({mcp});
+const settingsUI = createSettingsController({
+  onSectionChange: () => {
+    connectionUI.hideForms();
+    connectionUI.clearSecrets();
+    mcpUI.clearSecret();
+  },
+  onOpen: () => {
+    void mcpUI.refresh();
+  },
+  onClose: () => {
+    connectionUI.hideForms();
+    connectionUI.clearSecrets();
+    mcpUI.clearSecret();
+  },
+});
+void mcp.refresh();
 mind.refresh().then(() => connectionUI.paint());
 $('talk').value = state.talkLevel;
 $('talk').onchange = (e) => {
@@ -1607,6 +1641,9 @@ const app = createCellApp({
   tick,
   save,
   teardown: [
+    () => settingsUI.destroy(),
+    () => mcpUI.destroy(),
+    () => computerUI.destroy(),
     () => actions.cancelAll(),
     () => mind.destroy(),
     () => audio.destroy(),
@@ -1618,6 +1655,7 @@ app.start();
 
 // ---------- his computer: a desktop the audience can open, run his apps (sandboxed) and read his notes ----------
 const computerUI = createComputerController({
+  mcp,
   computer,
   slop,
   world,
@@ -1837,6 +1875,7 @@ berserker = createBerserker(world, body, grapple, {
 });
 $('berserker-enter').onclick = () => berserker.enter($('berserker-character').value);
 window.__CELL = {
+  mcp,
   nervous,
   cognitive,
   sessionMemory,

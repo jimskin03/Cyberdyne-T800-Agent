@@ -12,6 +12,7 @@ export function operatorCommand(raw) {
  if(text.includes('?')||/^(?:can|could|would|will|do|does|did|what|where|when|why|how|is|are|have|should)\b/i.test(text))return null;
  text=text.replace(/[.!]+$/,'').replace(/(?:\s+(?:properly|closely|carefully|please))+$/i,'').trim();
  const t=text.toLowerCase();
+ if (/^(?:list mcp (?:sources|tools|resources)|mcp (?:list|sources)|check mcp)$/.test(t)) return [commandAction('mcp',{op:'list'})];
  const target=s=>s.replace(/^(?:(?:the|a|an|fucking|goddamn|damn)\s+)+/i,'').trim();
  if (/^(?:stop|stop moving|stand still|stay still|wait)$/.test(t)) return [commandAction('wait',{seconds:10})];
  if (/^(?:stand|stand up|get up)$/.test(t)) return [commandAction('stand_up')];

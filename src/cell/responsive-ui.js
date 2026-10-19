@@ -31,6 +31,8 @@ export function setupResponsiveUI(memory){
  };
  const escapeKey=event=>{if(event.key==='Escape'&&opened){event.preventDefault();showPanel(null,true);}};
  const compactChange=()=>showPanel(null);
+ const settingsOpen=()=>showPanel(null);
+ document.addEventListener('cell:settings-open',settingsOpen);
  controls.addEventListener('click',controlsClick);
  addEventListener('keydown',escapeKey);
  compact.addEventListener('change',compactChange);
@@ -61,6 +63,7 @@ export function setupResponsiveUI(memory){
  window.visualViewport?.addEventListener('scroll',updateViewport);
  addEventListener('resize',updateViewport);updateTop();updateViewport();
  return {destroy(){
+  document.removeEventListener('cell:settings-open',settingsOpen);
   startObserver.disconnect();bodyObserver.disconnect();topObserver.disconnect();controls.removeEventListener('click',controlsClick);removeEventListener('keydown',escapeKey);compact.removeEventListener('change',compactChange);window.visualViewport?.removeEventListener('resize',updateViewport);window.visualViewport?.removeEventListener('scroll',updateViewport);removeEventListener('resize',updateViewport);
   for(const entry of panels){entry.button.onclick=null;entry.close.onclick=null;entry.heading.remove();}
  }};

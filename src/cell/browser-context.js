@@ -21,7 +21,7 @@ export function readBrowserContext(){
 export function workstationAction(action){
  const do_=String(action?.do||action?.action||'').toLowerCase().replace(/ /g,'_');
  const target=String(action?.target??action?.object??action?.on??'').toLowerCase();
- return /^(browser|slopcannon|code|program|create_app|edit_app|run_app)$/.test(do_)||/^(computer|crt|pc|monitor|screen|keyboard|terminal|table|stool)$/.test(target);
+ return /^(browser|slopcannon|mcp|code|program|create_app|edit_app|run_app)$/.test(do_)||/^(computer|crt|pc|monitor|screen|keyboard|terminal|table|stool)$/.test(target);
 }
 export function waitingDecisionIssues(decision,{browserWaiting=false,browserRequested=false,canCheckBrowser=false,atComputer=false}={}){
  if(!browserWaiting||browserRequested)return [];

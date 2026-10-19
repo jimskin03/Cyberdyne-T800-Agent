@@ -76,7 +76,9 @@ export function createMind({
         input.freshVision ?? (!input.intercom || wantsFreshVision(input.intercomText));
       st.visionSkipped = !freshVision;
       try {
-        if (input.observationReply && input.observation)
+        if (input.observationReply && input.observation?.source === 'mcp')
+          visualObservation = 'No new optical reading. External MCP data is supplied separately.';
+        else if (input.observationReply && input.observation)
           visualObservation =
             'Completed navigation target: ' +
             input.observation.target +
@@ -111,6 +113,8 @@ export function createMind({
 
       const msgs = buildMessages({
         ...input,
+        externalObservation: input.observation?.source === 'mcp' ? input.observation.text : '',
+        externalCatalog: !!input.observation?.catalog,
         visualObservation,
         thoughtRhythm: focus.text,
         senses:
