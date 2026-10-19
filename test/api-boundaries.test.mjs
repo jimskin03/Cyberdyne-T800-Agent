@@ -14,6 +14,18 @@ test('connection state switches session configuration without exposing credentia
  state.clear();assert.equal(state.current().endpoint,base.endpoint);
 });
 
+test('OpenRouter reasoning adaptation stays server-side and does not add provider fields to other services',()=>{
+ const request={model:'agent',messages:[{role:'user',content:'Hello'}],effort:'low',max_tokens:1500,reasoning:{effort:'high'}};
+ for(const endpoint of ['https://provider.invalid/v1/chat/completions','https://openrouter.ai.example/v1/chat/completions']){
+  const checked=validateChatRequest(request,{endpoint,textModel:'unit-model'});
+  assert.equal(Object.hasOwn(checked.payload,'reasoning'),false);
+  assert.equal(Object.hasOwn(checked.payload,'effort'),false);
+ }
+ const live={endpoint:'https://openrouter.ai/api/v1/chat/completions',textModel:'openrouter/free'};
+ assert.deepEqual(validateChatRequest(request,live).payload.reasoning,{effort:'low'});
+ assert.equal(Object.hasOwn(validateChatRequest({...request,effort:'client-chosen'},live).payload,'reasoning'),false);
+});
+
 test('request validation owns aliases, bounds and provider payload projection',()=>{
  const live={textModel:'text-model',visionModel:'vision-model',creativeModel:'creative-model'};
  const value=validateChatRequest({model:'creative',messages:[{role:'user',content:[{type:'text',text:'a'},{type:'text',text:'b'}]}],max_tokens:10,temperature:.5},live);

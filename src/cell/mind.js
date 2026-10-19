@@ -15,6 +15,7 @@ import {
 } from '../repetition.js';
 import {waitingDecisionIssues, workstationAction} from './browser-context.js';
 import {createLlmClient} from './ai/llm-client.js';
+import {LlmRequestError} from './ai/request-errors.js';
 import {createConnectionState, applyConnectionHealth} from './ai/connection-state.js';
 import {createCreativeGenerator} from './ai/creative.js';
 import {
@@ -137,6 +138,7 @@ export function createMind({
           );
           const decision = parseDecision(json.choices?.[0]?.message?.content);
           st.calls++;
+          st.fails = 0;
           st.lastMs = Math.round(performance.now() - t0);
 
           if (
@@ -225,17 +227,20 @@ export function createMind({
             )
               return decision;
           }
-        } catch {
+        } catch (error) {
           if (signal.aborted) {
             st.lastError = 'Reply cancelled or timed out.';
             return null;
           }
-          st.lastError = 'AI request failed. Check the configured adapter and model access.';
+          st.lastError = error instanceof LlmRequestError
+            ? error.message
+            : 'AI request failed. Check the configured adapter and model access.';
           st.fails++;
-          if (st.fails > 4) {
-            st.online = false;
-            st.fails = 0;
-          }
+          // Adapter reachability comes from health polling. A provider rejection
+          // must not hide the useful error behind an offline status.
+          // Correction attempts are for unusable decisions. Repeating a failed
+          // transport request immediately can exhaust provider rate limits.
+          return null;
         }
       }
 
