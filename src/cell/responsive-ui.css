@@ -29,7 +29,7 @@ body:not(.feed-started) .json-brain[data-context=cell]{visibility:hidden}
  #lab button,.json-brain[data-context=cell] button{min-height:44px;font-size:12px}
  #lab input[type=checkbox]{width:20px;height:20px}
  #lab input[type=range]{min-height:32px}
- #lab select,.json-brain[data-context=cell] select{min-height:40px;max-width:100%;font-size:12px}
+ #lab select,.json-brain[data-context=cell] select,.json-brain[data-context=cell] .jb-picker-trigger,.json-brain[data-context=cell] .jb-picker-search{min-height:40px;max-width:100%;font-size:12px}
  #lab .control-row{flex-wrap:wrap}
  #lab .control-row button{flex:1 1 100px}
  #lab .check,#lab .rowlabel,#lab .slide,#lab .hint{font-size:11px}
