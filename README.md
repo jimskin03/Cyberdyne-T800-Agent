@@ -107,7 +107,7 @@ Storage, from most to least durable:
 | Where | When | Survives |
 | --- | --- | --- |
 | Turso (libSQL) cloud database | `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` are set where `npm run api` runs | Reloads, adapter restarts, other computers |
-| Local files, `saved-world/memory/learned-cell.jsonl` | Default when `npm run api` runs (zero config) | Reloads and adapter restarts |
+| Local files, `saved-world/memory/learned-cell.jsonl` | Default when `npm run api` runs (zero config). The deletion generation is `epochs.json` in that directory | Reloads and adapter restarts |
 | This browser's `localStorage` | Only when the adapter isn't running or rejects the token | Reloads in the same browser |
 
 The browser keeps unsynced records until the adapter acknowledges them, then sends the backlog in batches. At the local limit it drops already-synced copies first. When every saved record is still waiting, new records are refused and the waiting ones remain. **Settings → Mind → Learned memory** shows where memory is currently saved. Recall matches words of three or more letters, acronyms, and Chinese characters. A blank recall browses recent records; a search that matches nothing adds no memories.
@@ -119,11 +119,13 @@ The browser keeps unsynced records until the adapter acknowledges them, then sen
 1. Create a database: `turso db create t800-memory`.
 2. Get its URL with `turso db show t800-memory --url` and a token with `turso db tokens create t800-memory`.
 3. Add both to the ignored `.env` on the machine that runs `npm run api`, as `TURSO_DATABASE_URL=libsql://…` and `TURSO_AUTH_TOKEN=…`. You can also export them in that shell.
-4. Restart `npm run api`. It logs `Learned memory: Turso cloud database` and creates the `learned_memory` table on first use.
+4. Restart `npm run api`. It logs `Learned memory: Turso cloud database` and creates the `learned_memory` and `learned_memory_epoch` tables on first use.
 
 The credentials stay in the Node backend. The browser bundle never sees them. To go back to local files, remove both variables. Local files are not copied to Turso automatically.
 
 **Reset behavior.** **Reset session memory** clears only the current session's browser state, and **Restore previous session** still undoes it. Learned memory is kept. **Forget learned memory…** is a separate button. It asks for confirmation, then deletes the learned memories in the adapter's store (local files or Turso) and in this browser. If the adapter cannot be cleared, the browser copy stays; a second confirmation can delete just that copy. The adapter also rejects a clear request that doesn't include the explicit confirmation phrase.
+
+Each clear advances a generation stored with the memories. That generation survives an adapter restart. A browser uploads with the generation it last had accepted, and a sync without a generation is rejected. If another browser has deleted learned memory, the adapter refuses the older generation. This browser keeps those copies and does not upload them again. **Upload this browser's copies** sends them on purpose. **Discard this browser's copies** drops them. Records saved after that refusal sync on their own.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |

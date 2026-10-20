@@ -142,6 +142,55 @@ test('reset keeps one compatible undo slot and restores namespaced state',async(
   expect(await page.evaluate(()=>localStorage.getItem('cell-public-test.marker'))).toBe('kept-for-undo');
 });
 
+test('deleted learned memory stays in this browser until the operator uploads it',async({page,request})=>{
+  test.setTimeout(180_000);
+  await openFresh(page,request);
+  await page.evaluate(()=>localStorage.setItem('cell-learned-memory.v1',JSON.stringify({
+    version:1,
+    epoch:0,
+    records:[{id:'old',kind:'note',text:'Deleted on another screen.',at:4,session:null,synced:false}],
+  })));
+  const posts=[];
+  await page.route('**/llm/memory/**',async route=>{
+    const req=route.request();
+    const path=new URL(req.url()).pathname;
+    if(req.method()==='GET'&&path.endsWith('/status')){
+      await route.fulfill({json:{available:true,backend:'local',scope:'cell',count:0,epoch:3}});
+      return;
+    }
+    if(req.method()==='POST'&&path.endsWith('/records')){
+      const body=JSON.parse(req.postData()||'{}');
+      posts.push(body);
+      if(body.epoch!==3){
+        await route.fulfill({status:409,json:{code:'memory_stale',error:'Memory sync is stale.',epoch:3}});
+        return;
+      }
+      await route.fulfill({json:{backend:'local',stored:body.records.length,acknowledged:body.records.map(record=>record.id),epoch:3}});
+      return;
+    }
+    await route.fulfill({json:{backend:'local',records:[]}});
+  });
+  await page.reload();
+  await page.waitForFunction(()=>window.__CELL?.world);
+  await expect.poll(()=>posts.length).toBe(1);
+  expect(posts[0].epoch).toBe(0);
+  expect(posts[0].records.map(record=>record.id)).toEqual(['old']);
+  await startFeed(page);
+  await page.locator('#settings-toggle').click();
+  await expect(page.locator('#learned-reconcile')).toBeVisible();
+  await expect(page.locator('#learned-status')).toContainText('deleted somewhere else');
+  page.once('dialog',dialog=>dialog.accept());
+  await page.locator('#learned-upload').click();
+  await expect.poll(()=>posts.length).toBe(2);
+  expect(posts[1].epoch).toBe(3);
+  expect(posts[1].records.map(record=>record.id)).toEqual(['old']);
+  await expect(page.locator('#learned-status')).toContainText('Uploaded 1 learned memory');
+  await expect(page.locator('#learned-reconcile')).toBeHidden();
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('cell-learned-memory.v1')));
+  expect(saved.records.find(record=>record.id==='old').synced).toBe(true);
+  expect(saved.epoch).toBe(3);
+});
+
 test('fresh startup records a reproducible local browser baseline',async({page,request})=>{
   await openFresh(page,request);
   const metrics=await page.evaluate(()=>{

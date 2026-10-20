@@ -102,7 +102,11 @@
  <h3>Learned memory</h3>
  <p id="learned-status" class="hint" role="status">Learned memory: checking…</p>
  <label class="rowlabel" id="learned-token-row" hidden>Memory token <input id="learned-token" type="password" autocomplete="off" spellcheck="false" placeholder="MEMORY_API_TOKEN"></label>
- <p class="hint">While the AI mind is on, conversations are saved by the adapter (local files, or Turso when configured) and recalled in later sessions. On this computer no token is needed; remote scenes enter the adapter's memory token once. Forget learned memory removes the adapter store and this browser copy. If the adapter cannot be cleared, the browser copy stays unless you confirm deleting it here.</p>
+ <p class="hint">While the AI mind is on, conversations are saved by the adapter (local files, or Turso when configured) and recalled in later sessions. On this computer no token is needed; remote scenes enter the adapter's memory token once. Forget learned memory removes the adapter store and this browser copy. If the adapter cannot be cleared, the browser copy stays unless you confirm deleting it here. If learned memory was deleted in another browser, copies this browser has not uploaded stay here until you upload or discard them.</p>
+ <div class="control-row" id="learned-reconcile" hidden>
+  <button id="learned-upload" type="button">Upload this browser's copies</button>
+  <button id="learned-discard" type="button">Discard this browser's copies</button>
+ </div>
  <div class="control-row"><button id="learned-forget" type="button">Forget learned memory…</button></div>
  </section>
  <section id="mcp-settings" role="tabpanel" aria-labelledby="settings-mcp-tab" hidden>

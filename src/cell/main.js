@@ -1404,6 +1404,13 @@ function showLearnedStatus() {
       : st.backend === 'local'
         ? 'adapter files on this computer'
         : 'this browser only';
+  $('learned-reconcile').hidden = !st.conflict;
+  $('learned-token-row').hidden = !st.tokenRequired && !learnedMemory.hasToken();
+  if (st.conflict) {
+    $('learned-status').textContent =
+      `Learned memory was deleted somewhere else. ${st.held} ${st.held === 1 ? 'copy stays' : 'copies stay'} in this browser until you upload or discard them.`;
+    return;
+  }
   $('learned-status').textContent =
     (st.tokenRequired
       ? 'Adapter needs the memory token. Saving in this browser until it is set. '
@@ -1415,7 +1422,6 @@ function showLearnedStatus() {
     where +
     (st.pending ? ` (${st.pending} waiting to sync)` : '') +
     '.';
-  $('learned-token-row').hidden = !st.tokenRequired && !learnedMemory.hasToken();
 }
 $('learned-token').onchange = async () => {
   learnedMemory.setToken($('learned-token').value);
@@ -1454,6 +1460,32 @@ $('learned-forget').onclick = async () => {
   showLearnedStatus();
   $('learned-status').textContent =
     `Learned memory deleted (${result?.removed ?? 0} stored records).`;
+};
+$('learned-upload').onclick = async () => {
+  if (
+    !confirm(
+      "Upload this browser's copies of learned memory? They were kept back because learned memory was deleted somewhere else.",
+    )
+  )
+    return;
+  const result = await learnedMemory.reconcile('upload');
+  showLearnedStatus();
+  if (result?.uploaded) {
+    $('learned-status').textContent =
+      `Uploaded ${result.uploaded} learned ${result.uploaded === 1 ? 'memory' : 'memories'}.`;
+  }
+};
+$('learned-discard').onclick = async () => {
+  if (
+    !confirm(
+      "Discard this browser's copies of learned memory? They will not be uploaded. The JSON Brain and the current session are not changed.",
+    )
+  )
+    return;
+  const result = await learnedMemory.reconcile('discard');
+  showLearnedStatus();
+  $('learned-status').textContent =
+    `Discarded ${result?.discarded ?? 0} learned ${result?.discarded === 1 ? 'copy' : 'copies'} from this browser.`;
 };
 learnedMemory.refresh().then(showLearnedStatus);
 function intercom(q) {

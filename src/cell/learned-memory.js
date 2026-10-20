@@ -11,9 +11,10 @@ export const CLEAR_CONFIRMATION = 'forget-learned-memory';
 const parse = (value) => {
   try {
     const data = JSON.parse(value);
-    return Array.isArray(data?.records) ? data.records : [];
+    const epoch = Number.isInteger(data?.epoch) && data.epoch >= 0 ? data.epoch : 0;
+    return {records: Array.isArray(data?.records) ? data.records : [], epoch};
   } catch {
-    return [];
+    return {records: [], epoch: 0};
   }
 };
 
@@ -25,14 +26,15 @@ export function createLearnedMemory({
   localLimit = 500,
   now = () => Date.now(),
 } = {}) {
-  let records = parse(storage?.getItem?.(LEARNED_MEMORY_KEY));
+  const saved = parse(storage?.getItem?.(LEARNED_MEMORY_KEY));
+  let records = saved.records;
   let flushing = null;
   let flushAbort = null;
   let generation = 0;
-  let epochSeen = 0;
+  let epochSeen = saved.epoch;
   let closed = false;
   const recallAborts = new Set();
-  const status = {backend: 'browser', available: false, tokenRequired: false, pending: 0, capacity: false, error: ''};
+  const status = {backend: 'browser', available: false, tokenRequired: false, pending: 0, capacity: false, conflict: false, held: 0, error: ''};
   const persist = () => {
     // Drop the oldest synced copy first. Records the adapter has not accepted stay put.
     while (records.length > localLimit) {
@@ -40,10 +42,12 @@ export function createLearnedMemory({
       if (index < 0) break;
       records.splice(index, 1);
     }
-    status.pending = records.filter((r) => !r.synced).length;
-    status.capacity = records.length >= localLimit && status.pending === records.length;
+    status.held = records.filter((r) => r.held).length;
+    status.conflict = status.held > 0;
+    status.pending = records.filter((r) => !r.synced && !r.held).length;
+    status.capacity = records.length >= localLimit && records.every((r) => !r.synced);
     try {
-      storage?.setItem?.(LEARNED_MEMORY_KEY, JSON.stringify({version: 1, records}));
+      storage?.setItem?.(LEARNED_MEMORY_KEY, JSON.stringify({version: 1, epoch: epochSeen, records}));
     } catch {}
   };
   const token = () => {
@@ -81,7 +85,9 @@ export function createLearnedMemory({
     status.available = true;
     status.error = '';
     if (data.backend) status.backend = data.backend;
-    if (Number.isInteger(data.epoch)) epochSeen = data.epoch;
+    // Only an accepted write moves the generation. A status read must not
+    // authorize upload of records from an older generation.
+    if (String(init.method || 'GET').toUpperCase() === 'POST' && Number.isInteger(data.epoch) && data.epoch >= 0) epochSeen = data.epoch;
     return data;
   }
   function linkedSignal(signal, timeoutMs) {
@@ -105,10 +111,9 @@ export function createLearnedMemory({
 
     async function drain() {
       let total = 0;
-      let retriedStale = false;
       for (let round = 0; round < 50; round++) {
         if (closed || epoch !== generation) return total;
-        const batch = records.filter((r) => !r.synced).slice(0, 100);
+        const batch = records.filter((r) => !r.synced && !r.held).slice(0, 100);
         if (!batch.length) return total;
         let data;
         try {
@@ -117,19 +122,19 @@ export function createLearnedMemory({
           data = await call('/records', {
             method: 'POST',
             signal: AbortSignal.any(signals),
-            body: JSON.stringify({scope, epoch: epochSeen, records: batch.map(({synced, ...r}) => r)}),
+            body: JSON.stringify({scope, epoch: epochSeen, records: batch.map(({synced, held, ...r}) => r)}),
           });
         } catch (error) {
           if (error?.name === 'AbortError' || closed || epoch !== generation) return total;
-          if (error.status === 409 && Number.isInteger(error.epoch) && !retriedStale) {
+          // Someone deleted learned memory. Keep these copies for an explicit
+          // upload or discard, and do not send them again under the new generation.
+          if (error.status === 409 && Number.isInteger(error.epoch) && error.epoch >= 0) {
+            for (const record of records) if (!record.synced) record.held = true;
             epochSeen = error.epoch;
-            retriedStale = true;
-            round -= 1;
-            continue;
+            persist();
           }
           return total;
         }
-        retriedStale = false;
         if (closed || epoch !== generation) return total;
         const ok = new Set(data.acknowledged || []);
         if (!ok.size) return total;
@@ -198,6 +203,22 @@ export function createLearnedMemory({
         linked.done();
       }
       return describeLearned(found);
+    },
+    // upload sends held copies under the generation the adapter reported.
+    // discard drops them from this browser. Neither happens during a normal sync.
+    async reconcile(choice) {
+      if (closed || (choice !== 'upload' && choice !== 'discard')) return {resolved: false, uploaded: 0, discarded: 0};
+      if (flushing) await flushing.catch(() => {});
+      const targets = records.filter((r) => r.held);
+      if (choice === 'discard') {
+        const ids = new Set(targets.map((r) => r.id));
+        records = records.filter((r) => !ids.has(r.id));
+        persist();
+        return {resolved: true, uploaded: 0, discarded: ids.size};
+      }
+      for (const record of targets) record.held = false;
+      persist();
+      return {resolved: true, uploaded: await flush(), discarded: 0};
     },
     // Clears the adapter store first. The browser copy stays when that fails,
     // unless the operator explicitly chooses localOnly after seeing the failure.

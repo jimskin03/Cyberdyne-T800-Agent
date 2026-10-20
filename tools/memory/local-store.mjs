@@ -7,7 +7,9 @@ import {cleanScope, rankRecords} from './records.mjs';
 export function createLocalMemoryStore(directory, {maxRecords = 20000} = {}) {
   let queue = Promise.resolve();
   const cache = new Map();
+  let epochs = null;
   const file = (scope) => join(directory, `learned-${cleanScope(scope)}.jsonl`);
+  const epochsFile = join(directory, 'epochs.json');
   const run = (task) => {
     const job = queue.then(task);
     queue = job.catch(() => {});
@@ -45,8 +47,36 @@ export function createLocalMemoryStore(directory, {maxRecords = 20000} = {}) {
     await writeFile(path + '.next', rows.map((r) => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : ''), {mode: 0o600});
     await rename(path + '.next', path);
   }
+  async function loadEpochs() {
+    if (epochs) return epochs;
+    let parsed = {};
+    try {
+      parsed = JSON.parse(await readFile(epochsFile, 'utf8'));
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    epochs = Object.create(null);
+    if (parsed && typeof parsed === 'object') {
+      for (const [key, value] of Object.entries(parsed)) {
+        if (Number.isInteger(value) && value >= 0) epochs[key] = value;
+      }
+    }
+    return epochs;
+  }
+  async function saveEpochs(map) {
+    await mkdir(directory, {recursive: true, mode: 0o700});
+    await writeFile(epochsFile + '.next', JSON.stringify(map) + '\n', {mode: 0o600});
+    await rename(epochsFile + '.next', epochsFile);
+  }
   return {
     backend: 'local',
+    epoch(scope) {
+      return run(async () => {
+        const map = await loadEpochs();
+        const value = map[cleanScope(scope)];
+        return Number.isInteger(value) ? value : 0;
+      });
+    },
     add(scope, records) {
       return run(async () => {
         const entry = await load(scope),
@@ -76,10 +106,17 @@ export function createLocalMemoryStore(directory, {maxRecords = 20000} = {}) {
     },
     clear(scope) {
       return run(async () => {
+        scope = cleanScope(scope);
         const removed = (await load(scope)).rows.length;
+        // Advance the generation before deleting records. A crash in between
+        // keeps the new generation, so a restarted adapter still rejects a stale re-upload.
+        const map = await loadEpochs();
+        const next = (Number.isInteger(map[scope]) ? map[scope] : 0) + 1;
+        map[scope] = next;
+        await saveEpochs(map);
         await rm(file(scope), {force: true});
         cache.set(scope, {rows: [], ids: new Set()});
-        return {removed};
+        return {removed, epoch: next};
       });
     },
     close() {},

@@ -84,7 +84,8 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==='GET'&&url.pathname==='/memory/recall')return json(res,200,{backend:'local',records:[...learned.values()].slice(-6)});
     if(req.method==='POST'&&url.pathname==='/memory/records'){
       const data=await body(req);
-      if(Number.isInteger(data.epoch)&&data.epoch!==memoryEpoch)return json(res,409,{code:'memory_stale',error:'Memory sync is stale.',epoch:memoryEpoch});
+      if(!Number.isInteger(data.epoch)||data.epoch<0)return json(res,400,{code:'memory_epoch_required',error:'Memory sync needs a generation.'});
+      if(data.epoch!==memoryEpoch)return json(res,409,{code:'memory_stale',error:'Memory sync is stale.',epoch:memoryEpoch});
       for(const r of data.records||[])learned.set(r.id,r);
       return json(res,200,{backend:'local',stored:(data.records||[]).length,acknowledged:(data.records||[]).map(r=>r.id),epoch:memoryEpoch});
     }

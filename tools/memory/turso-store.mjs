@@ -6,6 +6,8 @@ const SCHEMA = [
     text TEXT NOT NULL, at INTEGER NOT NULL, stored_at INTEGER NOT NULL,
     PRIMARY KEY (scope, id))`,
   'CREATE INDEX IF NOT EXISTS learned_memory_scope_at ON learned_memory (scope, at DESC)',
+  `CREATE TABLE IF NOT EXISTS learned_memory_epoch (
+    scope TEXT PRIMARY KEY, epoch INTEGER NOT NULL)`,
 ];
 const row = (r) => ({
   id: String(r.id),
@@ -88,11 +90,35 @@ export async function createTursoMemoryStore({url, authToken, client = null} = {
       const result = await client.execute({sql: 'SELECT count(*) AS n FROM learned_memory WHERE scope = ?', args: [scope]});
       return Number(result.rows[0]?.n || 0);
     },
+    async epoch(scope) {
+      scope = cleanScope(scope);
+      await init();
+      const result = await client.execute({
+        sql: 'SELECT epoch FROM learned_memory_epoch WHERE scope = ?',
+        args: [scope],
+      });
+      const value = Number(result.rows[0]?.epoch);
+      return Number.isInteger(value) && value >= 0 ? value : 0;
+    },
     async clear(scope) {
       scope = cleanScope(scope);
       await init();
-      const result = await client.execute({sql: 'DELETE FROM learned_memory WHERE scope = ?', args: [scope]});
-      return {removed: Number(result.rowsAffected || 0)};
+      // One batch commits the delete and the generation together.
+      const results = await client.batch(
+        [
+          {sql: 'SELECT count(*) AS n FROM learned_memory WHERE scope = ?', args: [scope]},
+          {sql: 'DELETE FROM learned_memory WHERE scope = ?', args: [scope]},
+          {
+            sql: `INSERT INTO learned_memory_epoch (scope, epoch) VALUES (?, 1)
+              ON CONFLICT(scope) DO UPDATE SET epoch = epoch + 1
+              RETURNING epoch`,
+            args: [scope],
+          },
+        ],
+        'write',
+      );
+      const epoch = Number(results[2]?.rows?.[0]?.epoch);
+      return {removed: Number(results[0]?.rows?.[0]?.n || 0), epoch: Number.isInteger(epoch) ? epoch : 0};
     },
     close() {
       client.close?.();

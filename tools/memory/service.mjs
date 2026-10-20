@@ -10,7 +10,6 @@ const digest = (value) => createHash('sha256').update(String(value)).digest();
 
 function bindMemory(memory) {
   if (memory.mutate) return memory;
-  memory.epochs = new Map();
   let mutations = Promise.resolve();
   // Adds and clears share one queue so a sync that started before a forget cannot land after it.
   memory.mutate = (task) => {
@@ -23,8 +22,6 @@ function bindMemory(memory) {
   };
   return memory;
 }
-
-const epochOf = (memory, scope) => memory.epochs.get(scope) ?? 0;
 
 export function memoryAuthorized(req, token) {
   if (!token) return false;
@@ -64,7 +61,7 @@ export async function handleMemoryRequest(req, res, pathname, memory) {
         backend: memory.store.backend,
         scope,
         count: await memory.store.count(scope),
-        epoch: epochOf(memory, scope),
+        epoch: await memory.store.epoch(scope),
       });
     } else if (req.method === 'GET' && pathname === '/memory/recall') {
       const scope = cleanScope(url.searchParams.get('scope') || 'cell');
@@ -76,13 +73,20 @@ export async function handleMemoryRequest(req, res, pathname, memory) {
       await memory.mutate(async () => {
         const body = await readJson(req, {limit: 256 * 1024});
         const {scope, records} = cleanBatch(body);
-        if (Number.isInteger(body?.epoch) && body.epoch !== epochOf(memory, scope)) {
-          send(409, {code: 'memory_stale', error: 'Memory sync is stale.', epoch: epochOf(memory, scope)});
+        const epoch = await memory.store.epoch(scope);
+        // A missing generation used to be accepted as current, which let a restarted
+        // adapter or another browser recreate memories that had been deleted.
+        if (!Number.isInteger(body?.epoch) || body.epoch < 0) {
+          send(400, {code: 'memory_epoch_required', error: 'Memory sync needs a generation.'});
+          return;
+        }
+        if (body.epoch !== epoch) {
+          send(409, {code: 'memory_stale', error: 'Memory sync is stale.', epoch});
           return;
         }
         send(200, {
           backend: memory.store.backend,
-          epoch: epochOf(memory, scope),
+          epoch,
           ...(await memory.store.add(scope, records)),
         });
       });
@@ -95,8 +99,7 @@ export async function handleMemoryRequest(req, res, pathname, memory) {
         }
         const scope = cleanScope(body.scope);
         const cleared = await memory.store.clear(scope);
-        memory.epochs.set(scope, epochOf(memory, scope) + 1);
-        send(200, {backend: memory.store.backend, epoch: epochOf(memory, scope), ...cleared});
+        send(200, {backend: memory.store.backend, ...cleared});
       });
     } else send(404, {error: 'Not found.'});
   } catch (error) {

@@ -33,14 +33,14 @@ function memoryStorage() {
 
 async function listen(server) {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const port = server.address().port;
+  const {port} = server.address();
   const call = (path, {method = 'GET', token, body} = {}) =>
     fetch(`http://127.0.0.1:${port}${path}`, {
       method,
       headers: {...(token ? {authorization: 'Bearer ' + token} : {}), ...(body ? {'content-type': 'application/json'} : {})},
       body: body ? JSON.stringify(body) : undefined,
     }).then(async (r) => ({status: r.status, data: await r.json()}));
-  return {call, close: () => new Promise((resolve) => server.close(resolve))};
+  return {port, call, close: () => new Promise((resolve) => server.close(resolve))};
 }
 
 test('record validation keeps only bounded interaction kinds', () => {
@@ -65,8 +65,13 @@ test('local file store deduplicates, survives a restart and clears only on reque
     assert.deepEqual((await restarted.recall('cell', 'thermostat please')).map((r) => r.id), ['m1']);
     assert.deepEqual((await restarted.recall('cell', 'towel thermostat', {excludeSession: 'session-a'})).map((r) => r.id), ['m2']);
     assert.equal(await restarted.count('other'), 0);
-    assert.equal((await restarted.clear('cell')).removed, 2);
-    assert.equal(await createLocalMemoryStore(dir).count('cell'), 0);
+    assert.equal(await restarted.epoch('cell'), 0);
+    const clearedStore = await restarted.clear('cell');
+    assert.equal(clearedStore.removed, 2);
+    assert.equal(clearedStore.epoch, 1);
+    const afterClear = createLocalMemoryStore(dir);
+    assert.equal(await afterClear.count('cell'), 0);
+    assert.equal(await afterClear.epoch('cell'), 1);
   } finally {
     await rm(dir, {recursive: true, force: true});
   }
@@ -77,7 +82,13 @@ test('Turso store uses parameterized SQL against an injected client', async () =
   const client = {
     async batch(statements, mode) {
       calls.push({batch: statements, mode});
-      return statements.map(() => ({rowsAffected: 1}));
+      return statements.map((statement) => {
+        const sql = typeof statement === 'string' ? statement : statement.sql;
+        if (/SELECT count\(\*\)/.test(sql)) return {rows: [{n: 3}]};
+        if (/RETURNING epoch/.test(sql)) return {rows: [{epoch: 1}]};
+        if (/^DELETE/.test(sql)) return {rowsAffected: 3, rows: []};
+        return {rowsAffected: 1, rows: []};
+      });
     },
     async execute(statement) {
       calls.push({execute: statement});
@@ -100,8 +111,14 @@ test('Turso store uses parameterized SQL against an injected client', async () =
   assert.doesNotMatch(select.sql, /LIMIT 300/);
   assert.deepEqual(select.args, ['%thermostat%', 'cell', 'now', '%thermostat%', 8]);
   assert.equal(await store.count('cell'), 3);
-  assert.equal((await store.clear('cell')).removed, 3);
-  assert.equal(calls.filter((c) => c.batch && c.batch.length === 2).length, 1, 'schema is created once');
+  const cleared = await store.clear('cell');
+  assert.equal(cleared.removed, 3);
+  assert.equal(cleared.epoch, 1);
+  const clearBatch = calls.at(-1).batch;
+  assert.match(clearBatch[2].sql, /ON CONFLICT\(scope\) DO UPDATE SET epoch = epoch \+ 1/);
+  assert.deepEqual(clearBatch[2].args, ['cell']);
+  assert.match(calls[0].batch[2], /CREATE TABLE IF NOT EXISTS learned_memory_epoch/);
+  assert.equal(calls.filter((c) => Array.isArray(c.batch) && typeof c.batch[0] === 'string').length, 1, 'schema is created once');
 });
 
 test('configuration picks Turso only when both credentials are set', async () => {
@@ -147,7 +164,10 @@ test('memory API requires the token, persists across adapter restarts and confir
     assert.equal((await api.call('/memory/status')).status, 401);
     assert.equal((await api.call('/memory/status', {token: 'wrong-token-0123456789'})).status, 401);
     assert.equal((await api.call('/memory/records', {method: 'POST', body: {records: [record('x1', 'Hi')]}})).status, 401);
-    const saved = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {records: [record('x1', 'The operator likes chess'), record('x2', 'Asked about chess openings', {kind: 'say'})]}});
+    const missingEpoch = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {records: [record('x0', 'No generation')]}});
+    assert.equal(missingEpoch.status, 400);
+    assert.equal(missingEpoch.data.code, 'memory_epoch_required');
+    const saved = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {epoch: 0, records: [record('x1', 'The operator likes chess'), record('x2', 'Asked about chess openings', {kind: 'say'})]}});
     assert.equal(saved.status, 200);
     assert.deepEqual(saved.data.acknowledged, ['x1', 'x2']);
     await api.close();
@@ -379,12 +399,129 @@ test('a stale sync cannot recreate memories cleared a moment earlier', async () 
     const stale = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {epoch: 0, records: [record('s1', 'Keep the chess board')]}});
     assert.equal(stale.status, 409);
     assert.equal(stale.data.epoch, 1);
+    const missing = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {records: [record('s3', 'No generation')]}});
+    assert.equal(missing.status, 400);
     assert.equal((await api.call('/memory/status', {token: TOKEN})).data.count, 0);
     const fresh = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {epoch: 1, records: [record('s2', 'A new note about rain')]}});
     assert.equal(fresh.status, 200);
     assert.equal((await api.call('/memory/status', {token: TOKEN})).data.count, 1);
   } finally {
     await api.close();
+    await rm(dir, {recursive: true, force: true});
+  }
+});
+
+test('a generation mismatch does not re-upload deleted memories', async () => {
+  const posts = [];
+  const fetcher = async (url, init = {}) => {
+    const body = init.body ? JSON.parse(init.body) : null;
+    if (String(url).includes('/records')) {
+      posts.push(body);
+      if (body.epoch !== 2) return Response.json({code: 'memory_stale', error: 'Memory sync is stale.', epoch: 2}, {status: 409});
+      return Response.json({backend: 'local', stored: body.records.length, acknowledged: body.records.map((r) => r.id), epoch: body.epoch});
+    }
+    return Response.json({available: true, backend: 'local', count: 0, epoch: 2});
+  };
+  const storage = memoryStorage();
+  let memory = createLearnedMemory({storage, fetcher});
+  memory.record({id: 'old', kind: 'note', text: 'Deleted on another screen.', at: 4});
+  await memory.refresh();
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].epoch, 0);
+  assert.deepEqual(posts[0].records.map((r) => r.id), ['old']);
+  assert.equal(memory.records[0].synced, false);
+  assert.equal(memory.status.conflict, true);
+  assert.equal(memory.status.held, 1);
+
+  memory.record({id: 'new', kind: 'note', text: 'Noted after the deletion was known.', at: 5});
+  assert.equal(await memory.flush(), 1);
+  assert.equal(posts.length, 2);
+  assert.equal(posts[1].epoch, 2);
+  assert.deepEqual(posts[1].records.map((r) => r.id), ['new']);
+  assert.equal('held' in posts[1].records[0], false);
+
+  const postsBeforeReload = posts.length;
+  memory = createLearnedMemory({storage, fetcher});
+  assert.equal(memory.status.conflict, true);
+  assert.equal(memory.records.find((r) => r.id === 'old').held, true);
+  assert.equal(await memory.flush(), 0);
+  assert.equal(posts.length, postsBeforeReload);
+
+  const restored = await memory.reconcile('upload');
+  assert.equal(restored.uploaded, 1);
+  assert.equal(posts.at(-1).epoch, 2);
+  assert.deepEqual(posts.at(-1).records.map((r) => r.id), ['old']);
+  assert.equal(memory.status.conflict, false);
+});
+
+test('discarding a conflict drops the local copies without uploading them', async () => {
+  let posts = 0;
+  const fetcher = async (url, init = {}) => {
+    if (String(url).includes('/records')) {
+      posts += 1;
+      const body = JSON.parse(init.body);
+      if (posts === 1) return Response.json({code: 'memory_stale', error: 'Memory sync is stale.', epoch: 1}, {status: 409});
+      return Response.json({backend: 'local', stored: body.records.length, acknowledged: body.records.map((r) => r.id), epoch: 1});
+    }
+    return Response.json({available: true, backend: 'local', epoch: 1});
+  };
+  const memory = createLearnedMemory({storage: memoryStorage(), fetcher});
+  memory.record({id: 'old', kind: 'note', text: 'Do not send this again.', at: 6});
+  assert.equal(await memory.flush(), 0);
+  memory.record({id: 'keep', kind: 'note', text: 'This one was saved after the conflict.', at: 7});
+  const discarded = await memory.reconcile('discard');
+  assert.equal(discarded.discarded, 1);
+  assert.deepEqual(memory.records.map((r) => r.id), ['keep']);
+  assert.equal(await memory.flush(), 1);
+  assert.equal(posts, 2);
+});
+
+test('another browser cannot restore memories deleted elsewhere, including after an adapter restart', async () => {
+  const dir = await tempDir();
+  const env = {MEMORY_API_TOKEN: TOKEN, MEMORY_DIR: dir};
+  let api;
+  try {
+    api = await listen(createApiServer(unconfigured, {memory: await createMemoryService(env)}));
+    const saved = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {epoch: 0, records: [record('s1', 'Keep the chess board')]}});
+    assert.equal(saved.status, 200);
+    const cleared = await api.call('/memory/clear', {method: 'POST', token: TOKEN, body: {confirm: CLEAR_CONFIRMATION}});
+    assert.equal(cleared.data.removed, 1);
+    assert.equal(cleared.data.epoch, 1);
+
+    const posts = [];
+    const other = createLearnedMemory({
+      storage: memoryStorage(),
+      base: `http://127.0.0.1:${api.port}/memory`,
+      fetcher: async (url, init = {}) => {
+        if (init.body) posts.push(JSON.parse(init.body));
+        return fetch(url, init);
+      },
+    });
+    other.setToken(TOKEN);
+    other.record({id: 's1', kind: 'intercom', text: 'Keep the chess board', at: 1_700_000_000_000, session: 'session-a'});
+    assert.equal(await other.flush(), 0);
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0].epoch, 0);
+    assert.equal(other.status.conflict, true);
+    assert.equal((await api.call('/memory/status', {token: TOKEN})).data.count, 0);
+    await api.close();
+
+    api = await listen(createApiServer(unconfigured, {memory: await createMemoryService(env)}));
+    const status = await api.call('/memory/status', {token: TOKEN});
+    assert.equal(status.data.epoch, 1);
+    assert.equal(status.data.count, 0);
+    const stale = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {epoch: 0, records: [record('s1', 'Keep the chess board')]}});
+    assert.equal(stale.status, 409);
+    assert.equal(stale.data.epoch, 1);
+    const missing = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {records: [record('s9', 'No generation')]}});
+    assert.equal(missing.status, 400);
+    assert.equal((await api.call('/memory/status', {token: TOKEN})).data.count, 0);
+    const fresh = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {epoch: 1, records: [record('s2', 'A note made after the restart')]}});
+    assert.equal(fresh.status, 200);
+    assert.equal((await api.call('/memory/recall?q=chess', {token: TOKEN})).data.records.length, 0);
+    assert.equal((await api.call('/memory/status', {token: TOKEN})).data.count, 1);
+  } finally {
+    await api?.close();
     await rm(dir, {recursive: true, force: true});
   }
 });
