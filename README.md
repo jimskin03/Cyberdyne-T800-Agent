@@ -110,7 +110,7 @@ Storage, from most to least durable:
 | Local files, `saved-world/memory/learned-cell.jsonl` | Default when `npm run api` runs (zero config) | Reloads and adapter restarts |
 | This browser's `localStorage` | Only when the adapter isn't running or rejects the token | Reloads in the same browser |
 
-The browser keeps a copy of each record until the adapter acknowledges it, so records made while the adapter or Turso is down are sent later without duplicates. **Settings → Mind → Learned memory** shows where memory is currently saved.
+The browser keeps unsynced records until the adapter acknowledges them, then sends the backlog in batches. At the local limit it drops already-synced copies first. When every saved record is still waiting, new records are refused and the waiting ones remain. **Settings → Mind → Learned memory** shows where memory is currently saved. Recall matches words of three or more letters, acronyms, and Chinese characters. A blank recall browses recent records; a search that matches nothing adds no memories.
 
 **Authentication.** Every `/memory` route on the adapter needs a bearer token. Set `MEMORY_API_TOKEN` in the adapter's environment or `.env` (at least 16 characters). If you leave it blank, the adapter creates a random token once and keeps it in `saved-world/memory/api-token`, an owner-only file, and it never prints the value. A browser on the same computer (`127.0.0.1` or `localhost`) gets the token from the dev or preview proxy automatically. A scene opened from somewhere else, like LAN, Tailscale or a tunnel, has to enter the token once under **Memory token**. That browser then keeps it in its own storage. The adapter still listens only on `127.0.0.1:18081`. Keep tokens in the environment where the backend runs. Don't paste them into chats or commit them.
 
@@ -123,7 +123,7 @@ The browser keeps a copy of each record until the adapter acknowledges it, so re
 
 The credentials stay in the Node backend. The browser bundle never sees them. To go back to local files, remove both variables. Local files are not copied to Turso automatically.
 
-**Reset behavior.** **Reset session memory** clears only the current session's browser state, and **Restore previous session** still undoes it. Learned memory is kept. **Forget learned memory…** is a separate button. It asks for confirmation, then deletes the learned memories in this browser and in the adapter's store, which is either the local files or Turso. The adapter also rejects a clear request that doesn't include the explicit confirmation phrase.
+**Reset behavior.** **Reset session memory** clears only the current session's browser state, and **Restore previous session** still undoes it. Learned memory is kept. **Forget learned memory…** is a separate button. It asks for confirmation, then deletes the learned memories in the adapter's store (local files or Turso) and in this browser. If the adapter cannot be cleared, the browser copy stays; a second confirmation can delete just that copy. The adapter also rejects a clear request that doesn't include the explicit confirmation phrase.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |

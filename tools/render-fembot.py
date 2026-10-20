@@ -98,6 +98,16 @@ scene.render.image_settings.file_format = 'PNG'
 scene.render.film_transparent = False
 scene.view_settings.view_transform = 'AgX'
 scene.render.filepath = str(OUTPUT/'Fembot-preview.png')
+# Stamp metadata writes the blend path into PNG tEXt chunks. Keep the preview free of machine paths.
+scene.render.use_stamp = False
+for flag in (
+    'use_stamp_time', 'use_stamp_date', 'use_stamp_render_time', 'use_stamp_frame',
+    'use_stamp_frame_range', 'use_stamp_memory', 'use_stamp_hostname', 'use_stamp_camera',
+    'use_stamp_lens', 'use_stamp_scene', 'use_stamp_marker', 'use_stamp_filename',
+    'use_stamp_note',
+):
+    if hasattr(scene.render, flag):
+        setattr(scene.render, flag, False)
 scene['asset_notes'] = 'Stylized reference interpretation. Host joint hierarchy is the animation rig; no replacement physics.'
 
 if bpy.context.screen:

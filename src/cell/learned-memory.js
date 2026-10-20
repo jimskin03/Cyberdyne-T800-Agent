@@ -27,14 +27,21 @@ export function createLearnedMemory({
 } = {}) {
   let records = parse(storage?.getItem?.(LEARNED_MEMORY_KEY));
   let flushing = null;
-  const status = {backend: 'browser', available: false, tokenRequired: false, pending: 0, error: ''};
+  let flushAbort = null;
+  let generation = 0;
+  let epochSeen = 0;
+  let closed = false;
+  const recallAborts = new Set();
+  const status = {backend: 'browser', available: false, tokenRequired: false, pending: 0, capacity: false, error: ''};
   const persist = () => {
-    // Drop the oldest synced copies first; unsynced records are kept longest.
+    // Drop the oldest synced copy first. Records the adapter has not accepted stay put.
     while (records.length > localLimit) {
       const index = records.findIndex((r) => r.synced);
-      records.splice(index < 0 ? 0 : index, 1);
+      if (index < 0) break;
+      records.splice(index, 1);
     }
     status.pending = records.filter((r) => !r.synced).length;
+    status.capacity = records.length >= localLimit && status.pending === records.length;
     try {
       storage?.setItem?.(LEARNED_MEMORY_KEY, JSON.stringify({version: 1, records}));
     } catch {}
@@ -61,36 +68,77 @@ export function createLearnedMemory({
     const data = await response.json().catch(() => ({}));
     status.tokenRequired = response.status === 401;
     if (!response.ok) {
-      status.available = false;
-      status.backend = 'browser';
-      status.error = response.status === 401 ? 'Memory token required' : data.error || 'Memory adapter unavailable';
-      throw Object.assign(Error(status.error), {status: response.status});
+      if (response.status !== 409) {
+        status.available = false;
+        status.backend = 'browser';
+        status.error = response.status === 401 ? 'Memory token required' : data.error || 'Memory adapter unavailable';
+      }
+      throw Object.assign(Error(data.error || status.error || 'Memory sync is stale.'), {
+        status: response.status,
+        epoch: data.epoch,
+      });
     }
     status.available = true;
     status.error = '';
     if (data.backend) status.backend = data.backend;
+    if (Number.isInteger(data.epoch)) epochSeen = data.epoch;
     return data;
   }
+  function linkedSignal(signal, timeoutMs) {
+    const controller = new AbortController();
+    recallAborts.add(controller);
+    const signals = [controller.signal, AbortSignal.timeout(timeoutMs)];
+    if (signal) signals.push(signal);
+    return {signal: AbortSignal.any(signals), done: () => recallAborts.delete(controller)};
+  }
   async function flush({signal} = {}) {
+    if (closed) return 0;
     if (flushing) return flushing;
-    const batch = records.filter((r) => !r.synced).slice(0, 100);
-    if (!batch.length) return 0;
-    flushing = call('/records', {
-      method: 'POST',
-      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000),
-      body: JSON.stringify({scope, records: batch.map(({synced, ...r}) => r)}),
-    })
-      .then((data) => {
-        const ok = new Set(data.acknowledged || []);
-        for (const r of records) if (ok.has(r.id)) r.synced = true;
-        persist();
-        return ok.size;
-      })
-      .catch(() => 0)
-      .finally(() => {
-        flushing = null;
-      });
+    const epoch = generation;
+    const controller = new AbortController();
+    flushAbort = controller;
+    flushing = drain().finally(() => {
+      if (flushAbort === controller) flushAbort = null;
+      flushing = null;
+    });
     return flushing;
+
+    async function drain() {
+      let total = 0;
+      let retriedStale = false;
+      for (let round = 0; round < 50; round++) {
+        if (closed || epoch !== generation) return total;
+        const batch = records.filter((r) => !r.synced).slice(0, 100);
+        if (!batch.length) return total;
+        let data;
+        try {
+          const signals = [controller.signal, AbortSignal.timeout(5000)];
+          if (signal) signals.push(signal);
+          data = await call('/records', {
+            method: 'POST',
+            signal: AbortSignal.any(signals),
+            body: JSON.stringify({scope, epoch: epochSeen, records: batch.map(({synced, ...r}) => r)}),
+          });
+        } catch (error) {
+          if (error?.name === 'AbortError' || closed || epoch !== generation) return total;
+          if (error.status === 409 && Number.isInteger(error.epoch) && !retriedStale) {
+            epochSeen = error.epoch;
+            retriedStale = true;
+            round -= 1;
+            continue;
+          }
+          return total;
+        }
+        retriedStale = false;
+        if (closed || epoch !== generation) return total;
+        const ok = new Set(data.acknowledged || []);
+        if (!ok.size) return total;
+        for (const record of records) if (ok.has(record.id)) record.synced = true;
+        persist();
+        total += ok.size;
+      }
+      return total;
+    }
   }
   persist();
   return {
@@ -100,9 +148,13 @@ export function createLearnedMemory({
     },
     // Only called while the mind is on; non-interaction kinds are ignored.
     record(entry) {
-      if (!entry || !LEARNED_KINDS.includes(entry.kind) || typeof entry.text !== 'string') return false;
+      if (closed || !entry || !LEARNED_KINDS.includes(entry.kind) || typeof entry.text !== 'string') return false;
       const text = entry.text.trim().slice(0, MAX_TEXT);
       if (!text || records.some((r) => r.id === entry.id)) return false;
+      if (records.length >= localLimit && !records.some((r) => r.synced)) {
+        status.capacity = true;
+        return false;
+      }
       records.push({
         id: String(entry.id),
         kind: entry.kind,
@@ -116,47 +168,68 @@ export function createLearnedMemory({
     },
     flush,
     async refresh({signal} = {}) {
+      if (closed) return null;
+      const linked = linkedSignal(signal, 3000);
       try {
-        const data = await call('/status?scope=' + scope, {signal: signal || AbortSignal.timeout(3000)});
-        await flush({signal});
+        const data = await call('/status?scope=' + scope, {signal: linked.signal});
+        await flush({signal: linked.signal});
         return data;
       } catch {
         return null;
+      } finally {
+        linked.done();
       }
     },
     // Earlier-session interactions for the prompt. Falls back to the browser copy.
     async recall(query, {signal, session = '', limit = 6} = {}) {
+      if (closed) return '';
+      const linked = linkedSignal(signal, 3000);
       let found = null;
       void flush();
       try {
         const params = new URLSearchParams({scope, q: String(query || '').slice(0, 800), limit: String(limit)});
         if (session) params.set('excludeSession', session);
-        const data = await call('/recall?' + params, {
-          signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(3000)]) : AbortSignal.timeout(3000),
-        });
+        const data = await call('/recall?' + params, {signal: linked.signal});
         found = Array.isArray(data.records) ? data.records : [];
       } catch (error) {
-        if (signal?.aborted) return '';
+        if (closed || signal?.aborted || error?.name === 'AbortError') return '';
         found = rankRecords(records, query, {limit, excludeSession: session});
+      } finally {
+        linked.done();
       }
       return describeLearned(found);
     },
-    // Wipes the browser copy and the adapter store (local files or cloud).
-    // Callers must have asked the operator first; the adapter also requires the phrase.
-    async forget({signal} = {}) {
-      let remote = null;
-      try {
-        remote = await call('/clear', {
-          method: 'POST',
-          signal: signal || AbortSignal.timeout(8000),
-          body: JSON.stringify({scope, confirm: CLEAR_CONFIRMATION}),
-        });
-      } catch (error) {
-        remote = {error: error.message, status: error.status || 0};
+    // Clears the adapter store first. The browser copy stays when that fails,
+    // unless the operator explicitly chooses localOnly after seeing the failure.
+    // An in-flight sync is cancelled and its late acknowledgement is ignored.
+    async forget({signal, localOnly = false} = {}) {
+      generation += 1;
+      flushAbort?.abort();
+      if (flushing) await flushing.catch(() => {});
+      if (!localOnly) {
+        try {
+          const remote = await call('/clear', {
+            method: 'POST',
+            signal: signal || AbortSignal.timeout(8000),
+            body: JSON.stringify({scope, confirm: CLEAR_CONFIRMATION}),
+          });
+          records = [];
+          persist();
+          return {...remote, localCleared: true};
+        } catch (error) {
+          return {error: error.message, status: error.status || 0, localCleared: false};
+        }
       }
       records = [];
       persist();
-      return remote;
+      return {removed: 0, localCleared: true, localOnly: true};
+    },
+    destroy() {
+      closed = true;
+      generation += 1;
+      flushAbort?.abort();
+      for (const controller of [...recallAborts]) controller.abort();
+      recallAborts.clear();
     },
     setToken(value) {
       try {

@@ -155,3 +155,29 @@ test('cell app owns frame, hidden-tab and persistence scheduling and can tear th
   assert.equal(teardownCalls, 1);
   assert.equal(app.running, false);
 });
+
+test('destroy during a tick does not schedule another frame, and extra intervals stop too', () => {
+  const frames = [];
+  const cleared = [];
+  let app;
+  app = createCellApp({
+    state: {started: true},
+    document: {hidden: false},
+    window: {addEventListener() {}, removeEventListener() {}},
+    tick: () => app.destroy(),
+    save: () => {},
+    requestFrame: (fn) => {
+      frames.push(fn);
+      return frames.length;
+    },
+    cancelFrame: () => {},
+    setIntervalFn: () => 1,
+    clearIntervalFn: (id) => cleared.push(id),
+    intervals: [{fn: () => {}, ms: 15000}],
+  });
+  app.start();
+  frames[0](8);
+  assert.equal(frames.length, 1);
+  assert.equal(app.destroyed, true);
+  assert.equal(cleared.length, 3);
+});

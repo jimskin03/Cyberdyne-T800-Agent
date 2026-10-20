@@ -8,6 +8,24 @@ import {ensureMemoryToken, memoryConfiguration} from './config.mjs';
 export const CLEAR_CONFIRMATION = 'forget-learned-memory';
 const digest = (value) => createHash('sha256').update(String(value)).digest();
 
+function bindMemory(memory) {
+  if (memory.mutate) return memory;
+  memory.epochs = new Map();
+  let mutations = Promise.resolve();
+  // Adds and clears share one queue so a sync that started before a forget cannot land after it.
+  memory.mutate = (task) => {
+    const run = mutations.then(task, task);
+    mutations = run.then(
+      () => {},
+      () => {},
+    );
+    return run;
+  };
+  return memory;
+}
+
+const epochOf = (memory, scope) => memory.epochs.get(scope) ?? 0;
+
 export function memoryAuthorized(req, token) {
   if (!token) return false;
   const header = String(req.headers.authorization || '');
@@ -21,7 +39,7 @@ export async function createMemoryService(env = process.env, {client = null} = {
   const store = config.turso
     ? await createTursoMemoryStore({...config.turso, client})
     : createLocalMemoryStore(config.directory);
-  return {token, tokenSource: source, store, backend: store.backend, directory: config.directory};
+  return bindMemory({token, tokenSource: source, store, backend: store.backend, directory: config.directory});
 }
 
 // Routes under /memory. Every route needs the bearer token, including status.
@@ -36,11 +54,18 @@ export async function handleMemoryRequest(req, res, pathname, memory) {
     send(401, {code: 'memory_token_required', error: 'Learned memory needs the adapter memory token.'});
     return true;
   }
+  bindMemory(memory);
   const url = new URL(req.url || '/', 'http://127.0.0.1');
   try {
     if (req.method === 'GET' && pathname === '/memory/status') {
       const scope = cleanScope(url.searchParams.get('scope') || 'cell');
-      send(200, {available: true, backend: memory.store.backend, scope, count: await memory.store.count(scope)});
+      send(200, {
+        available: true,
+        backend: memory.store.backend,
+        scope,
+        count: await memory.store.count(scope),
+        epoch: epochOf(memory, scope),
+      });
     } else if (req.method === 'GET' && pathname === '/memory/recall') {
       const scope = cleanScope(url.searchParams.get('scope') || 'cell');
       const query = String(url.searchParams.get('q') || '').slice(0, 800);
@@ -48,13 +73,31 @@ export async function handleMemoryRequest(req, res, pathname, memory) {
       const excludeSession = String(url.searchParams.get('excludeSession') || '').slice(0, 80);
       send(200, {backend: memory.store.backend, records: await memory.store.recall(scope, query, {limit, excludeSession})});
     } else if (req.method === 'POST' && pathname === '/memory/records') {
-      const {scope, records} = cleanBatch(await readJson(req, {limit: 256 * 1024}));
-      send(200, {backend: memory.store.backend, ...(await memory.store.add(scope, records))});
+      await memory.mutate(async () => {
+        const body = await readJson(req, {limit: 256 * 1024});
+        const {scope, records} = cleanBatch(body);
+        if (Number.isInteger(body?.epoch) && body.epoch !== epochOf(memory, scope)) {
+          send(409, {code: 'memory_stale', error: 'Memory sync is stale.', epoch: epochOf(memory, scope)});
+          return;
+        }
+        send(200, {
+          backend: memory.store.backend,
+          epoch: epochOf(memory, scope),
+          ...(await memory.store.add(scope, records)),
+        });
+      });
     } else if (req.method === 'POST' && pathname === '/memory/clear') {
-      const body = await readJson(req, {limit: 4 * 1024});
-      if (body?.confirm !== CLEAR_CONFIRMATION)
-        send(400, {code: 'memory_confirmation_required', error: 'Clearing learned memory needs explicit confirmation.'});
-      else send(200, {backend: memory.store.backend, ...(await memory.store.clear(cleanScope(body.scope)))});
+      await memory.mutate(async () => {
+        const body = await readJson(req, {limit: 4 * 1024});
+        if (body?.confirm !== CLEAR_CONFIRMATION) {
+          send(400, {code: 'memory_confirmation_required', error: 'Clearing learned memory needs explicit confirmation.'});
+          return;
+        }
+        const scope = cleanScope(body.scope);
+        const cleared = await memory.store.clear(scope);
+        memory.epochs.set(scope, epochOf(memory, scope) + 1);
+        send(200, {backend: memory.store.backend, epoch: epochOf(memory, scope), ...cleared});
+      });
     } else send(404, {error: 'Not found.'});
   } catch (error) {
     // Store errors can mention database hosts; return a fixed message instead.

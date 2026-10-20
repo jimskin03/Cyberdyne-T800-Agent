@@ -6,6 +6,7 @@ let chatCalls=0;
 let visionCalls=0;
 let connectionCalls=0;
 const learned=new Map();
+let memoryEpoch=0;
 
 const json=(res,status,body)=>{
   res.writeHead(status,{'content-type':'application/json','cache-control':'no-store'});
@@ -79,16 +80,18 @@ const server=http.createServer(async(req,res)=>{
   }
   // Minimal learned-memory adapter so the scene sees a working backend store.
   if(url.pathname.startsWith('/memory/')){
-    if(req.method==='GET'&&url.pathname==='/memory/status')return json(res,200,{available:true,backend:'local',scope:'cell',count:learned.size});
+    if(req.method==='GET'&&url.pathname==='/memory/status')return json(res,200,{available:true,backend:'local',scope:'cell',count:learned.size,epoch:memoryEpoch});
     if(req.method==='GET'&&url.pathname==='/memory/recall')return json(res,200,{backend:'local',records:[...learned.values()].slice(-6)});
     if(req.method==='POST'&&url.pathname==='/memory/records'){
-      const data=await body(req);for(const r of data.records||[])learned.set(r.id,r);
-      return json(res,200,{backend:'local',stored:(data.records||[]).length,acknowledged:(data.records||[]).map(r=>r.id)});
+      const data=await body(req);
+      if(Number.isInteger(data.epoch)&&data.epoch!==memoryEpoch)return json(res,409,{code:'memory_stale',error:'Memory sync is stale.',epoch:memoryEpoch});
+      for(const r of data.records||[])learned.set(r.id,r);
+      return json(res,200,{backend:'local',stored:(data.records||[]).length,acknowledged:(data.records||[]).map(r=>r.id),epoch:memoryEpoch});
     }
-    if(req.method==='POST'&&url.pathname==='/memory/clear'){const removed=learned.size;learned.clear();return json(res,200,{backend:'local',removed});}
+    if(req.method==='POST'&&url.pathname==='/memory/clear'){const removed=learned.size;learned.clear();memoryEpoch+=1;return json(res,200,{backend:'local',removed,epoch:memoryEpoch});}
   }
   if(req.method==='POST'&&url.pathname==='/__reset'){
-    learned.clear();connected=false;agentName='Agent';chatCalls=0;visionCalls=0;connectionCalls=0;
+    learned.clear();memoryEpoch=0;connected=false;agentName='Agent';chatCalls=0;visionCalls=0;connectionCalls=0;
     return json(res,200,{ok:true});
   }
   if(req.method==='GET'&&url.pathname==='/__state')return json(res,200,{connected,agentName,chatCalls,visionCalls,connectionCalls});

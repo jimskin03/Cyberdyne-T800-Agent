@@ -17,7 +17,9 @@ const row = (r) => ({
 
 // Cloud store on Turso (libSQL). Credentials stay in this Node process; the
 // browser only ever talks to the token-protected /memory routes.
-export async function createTursoMemoryStore({url, authToken, client = null, candidates = 300} = {}) {
+const likeTerm = (term) => `%${String(term).replace(/[\\%_]/g, (char) => '\\' + char)}%`;
+
+export async function createTursoMemoryStore({url, authToken, client = null} = {}) {
   if (!client) {
     const {createClient} = await import('@libsql/client/web');
     client = createClient({url, authToken});
@@ -47,21 +49,38 @@ export async function createTursoMemoryStore({url, authToken, client = null, can
     async recall(scope, query, {limit = 8, excludeSession = ''} = {}) {
       scope = cleanScope(scope);
       await init();
-      const terms = queryTerms(query).slice(0, 8),
-        args = [scope];
-      let sql = 'SELECT id, session, kind, text, at FROM learned_memory WHERE scope = ?';
+      const trimmed = String(query || '').trim();
+      const terms = queryTerms(trimmed).slice(0, 8);
+      if (trimmed && !terms.length) return [];
+      const capped = Math.max(1, Math.min(20, Number(limit) || 8));
+      const likes = terms.map(likeTerm);
+      let sql = 'SELECT id, session, kind, text, at';
+      const args = [];
+      if (terms.length) {
+        sql +=
+          ', (' +
+          terms.map(() => "CASE WHEN lower(text) LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END").join(' + ') +
+          ") + CASE WHEN kind IN ('intercom', 'say') THEN 1 ELSE 0 END AS score";
+        args.push(...likes);
+      }
+      sql += ' FROM learned_memory WHERE scope = ?';
+      args.push(scope);
       if (excludeSession) {
         sql += ' AND (session IS NULL OR session <> ?)';
         args.push(excludeSession);
       }
       if (terms.length) {
-        sql += ' AND (' + terms.map(() => 'lower(text) LIKE ?').join(' OR ') + ')';
-        args.push(...terms.map((t) => `%${t}%`));
+        sql += ' AND (' + terms.map(() => "lower(text) LIKE ? ESCAPE '\\'").join(' OR ') + ')';
+        args.push(...likes);
+        sql += ' ORDER BY score DESC, at DESC LIMIT ?';
+        args.push(capped);
+      } else {
+        // No search terms: browse a recent window, then let shared ranking apply the caller's limit.
+        sql += ' ORDER BY at DESC LIMIT ?';
+        args.push(300);
       }
-      sql += ' ORDER BY at DESC LIMIT ?';
-      args.push(candidates);
       const result = await client.execute({sql, args});
-      return rankRecords(result.rows.map(row), query, {limit, excludeSession});
+      return rankRecords(result.rows.map(row), query, {limit: capped, excludeSession});
     },
     async count(scope) {
       scope = cleanScope(scope);

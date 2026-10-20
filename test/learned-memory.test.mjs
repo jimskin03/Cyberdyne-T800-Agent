@@ -8,7 +8,7 @@ import {createLocalMemoryStore} from '../tools/memory/local-store.mjs';
 import {createTursoMemoryStore} from '../tools/memory/turso-store.mjs';
 import {createMemoryService, memoryAuthorized, CLEAR_CONFIRMATION} from '../tools/memory/service.mjs';
 import {memoryConfiguration, ensureMemoryToken, readMemoryToken} from '../tools/memory/config.mjs';
-import {cleanBatch} from '../tools/memory/records.mjs';
+import {cleanBatch, queryTerms, rankRecords} from '../tools/memory/records.mjs';
 import {addMemoryToken} from '../tools/scene-proxy.mjs';
 import {createLearnedMemory, LEARNED_MEMORY_KEY, describeLearned} from '../src/cell/learned-memory.js';
 import {resetSessionStorage} from '../src/cell/storage/session-store.js';
@@ -96,8 +96,9 @@ test('Turso store uses parameterized SQL against an injected client', async () =
   const found = await store.recall('cell', 'thermostat', {excludeSession: 'now'});
   assert.equal(found[0].id, 't1');
   const select = calls.at(-1).execute;
-  assert.match(select.sql, /scope = \? AND \(session IS NULL OR session <> \?\) AND \(lower\(text\) LIKE \?\)/);
-  assert.deepEqual(select.args.slice(0, 3), ['cell', 'now', '%thermostat%']);
+  assert.match(select.sql, /ORDER BY score DESC, at DESC LIMIT \?/);
+  assert.doesNotMatch(select.sql, /LIMIT 300/);
+  assert.deepEqual(select.args, ['%thermostat%', 'cell', 'now', '%thermostat%', 8]);
   assert.equal(await store.count('cell'), 3);
   assert.equal((await store.clear('cell')).removed, 3);
   assert.equal(calls.filter((c) => c.batch && c.batch.length === 2).length, 1, 'schema is created once');
@@ -153,7 +154,7 @@ test('memory API requires the token, persists across adapter restarts and confir
 
     api = await listen(createApiServer(unconfigured, {memory: await createMemoryService(env)}));
     const status = await api.call('/memory/status', {token: TOKEN});
-    assert.deepEqual(status.data, {available: true, backend: 'local', scope: 'cell', count: 2});
+    assert.deepEqual(status.data, {available: true, backend: 'local', scope: 'cell', count: 2, epoch: 0});
     const recalled = await api.call('/memory/recall?q=chess&excludeSession=other', {token: TOKEN});
     assert.equal(recalled.data.records.length, 2);
     assert.equal((await api.call('/memory/recall?q=chess&excludeSession=session-a', {token: TOKEN})).data.records.length, 0);
@@ -257,6 +258,135 @@ test('browser client syncs to the adapter and forgets only with the confirmation
   assert.equal(result.removed, 4);
   assert.equal(JSON.parse(sent.at(-1).init.body).confirm, 'forget-learned-memory');
   assert.equal(memory.records.length, 0);
+  assert.equal(JSON.parse(sent[0].init.body).epoch, 0);
+});
+
+test('search keeps short words, acronyms and Han characters, and a useless query matches nothing', () => {
+  const records = [
+    {id: 'dog', kind: 'note', text: 'The dog waited by the door', at: 2},
+    {id: 'cat', kind: 'note', text: 'The cat sat on the radio', at: 1},
+    {id: 'mcp', kind: 'say', text: 'MCP listed the weather source', at: 3},
+    {id: 'cn', kind: 'intercom', text: '那只猫在看门', at: 4},
+  ];
+  assert.deepEqual(queryTerms('cat'), ['cat']);
+  assert.deepEqual(queryTerms('MCP'), ['mcp']);
+  assert.deepEqual(queryTerms('猫'), ['猫']);
+  assert.deepEqual(queryTerms('the'), []);
+  assert.deepEqual(rankRecords(records, 'cat').map((r) => r.id), ['cat']);
+  assert.deepEqual(rankRecords(records, 'MCP').map((r) => r.id), ['mcp']);
+  assert.deepEqual(rankRecords(records, '猫').map((r) => r.id), ['cn']);
+  assert.deepEqual(rankRecords(records, '???'), []);
+  assert.equal(rankRecords(records, '').length, 4);
+});
+
+test('the local limit keeps unsynced memories and drops synced copies first', async () => {
+  const storage = memoryStorage();
+  const fetcher = async (url, init = {}) => {
+    if (String(url).includes('/records')) {
+      const body = JSON.parse(init.body);
+      return Response.json({backend: 'local', stored: body.records.length, acknowledged: body.records.map((r) => r.id), epoch: 0});
+    }
+    return Response.json({available: true, backend: 'local', epoch: 0});
+  };
+  const offline = createLearnedMemory({storage: memoryStorage(), fetcher: async () => { throw new TypeError('offline'); }, localLimit: 2});
+  assert.equal(offline.record({id: 'a', kind: 'note', text: 'first memory', at: 1}), true);
+  assert.equal(offline.record({id: 'b', kind: 'note', text: 'second memory', at: 2}), true);
+  assert.equal(offline.record({id: 'c', kind: 'note', text: 'third memory', at: 3}), false);
+  assert.equal(offline.status.capacity, true);
+  assert.deepEqual(offline.records.map((r) => r.id), ['a', 'b']);
+
+  const memory = createLearnedMemory({storage, fetcher, localLimit: 2});
+  memory.record({id: 'a', kind: 'note', text: 'alpha memory', at: 1});
+  memory.record({id: 'b', kind: 'note', text: 'beta memory', at: 2});
+  assert.equal(await memory.flush(), 2);
+  assert.equal(memory.record({id: 'c', kind: 'note', text: 'gamma memory', at: 3}), true);
+  assert.deepEqual(memory.records.map((r) => r.id), ['b', 'c']);
+});
+
+test('flush drains the backlog in bounded batches', async () => {
+  const posts = [];
+  const fetcher = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    posts.push(body.records.length);
+    return Response.json({backend: 'local', stored: body.records.length, acknowledged: body.records.map((r) => r.id), epoch: 0});
+  };
+  const memory = createLearnedMemory({storage: memoryStorage(), fetcher});
+  for (let i = 0; i < 101; i++) memory.record({id: 'm' + i, kind: 'note', text: 'note ' + i, at: i + 1});
+  assert.equal(await memory.flush(), 101);
+  assert.deepEqual(posts, [100, 1]);
+  assert.equal(memory.status.pending, 0);
+});
+
+test('a failed remote forget keeps the browser copy until the operator deletes it locally', async () => {
+  const storage = memoryStorage();
+  const fetcher = async (url) => {
+    if (String(url).includes('/clear')) return Response.json({error: 'Memory token required'}, {status: 401});
+    return Response.json({error: 'down'}, {status: 503});
+  };
+  const memory = createLearnedMemory({storage, fetcher});
+  assert.equal(memory.record({id: 'k1', kind: 'note', text: 'Keep the towel folded.', at: 5, session: 's1'}), true);
+  const failed = await memory.forget();
+  assert.equal(failed.localCleared, false);
+  assert.equal(failed.status, 401);
+  assert.equal(memory.records.length, 1);
+  const local = await memory.forget({localOnly: true});
+  assert.equal(local.localCleared, true);
+  assert.equal(memory.records.length, 0);
+});
+
+test('an in-flight sync cannot restore memories after forget', async () => {
+  let release;
+  const fetcher = (url, init = {}) =>
+    new Promise((resolve, reject) => {
+      const fail = () => reject(Object.assign(new Error('aborted'), {name: 'AbortError'}));
+      if (init.signal?.aborted) return fail();
+      init.signal?.addEventListener('abort', fail, {once: true});
+      if (String(url).includes('/records')) {
+        release = () => resolve(Response.json({backend: 'local', stored: 1, acknowledged: ['z1'], epoch: 0}));
+        return;
+      }
+      if (String(url).includes('/clear')) {
+        resolve(Response.json({backend: 'local', removed: 1, epoch: 1}));
+        return;
+      }
+      resolve(Response.json({available: true, backend: 'local', count: 0, epoch: 0}));
+    });
+  const memory = createLearnedMemory({storage: memoryStorage(), fetcher});
+  memory.record({id: 'z1', kind: 'note', text: 'Temporary note about the door.', at: 9});
+  const flushing = memory.flush();
+  const forgotten = await memory.forget();
+  assert.equal(forgotten.removed, 1);
+  assert.equal(forgotten.localCleared, true);
+  assert.equal(memory.records.length, 0);
+  release?.();
+  assert.equal(await flushing, 0);
+  assert.equal(memory.records.length, 0);
+  memory.record({id: 'z2', kind: 'note', text: 'After the wipe.', at: 10});
+  assert.deepEqual(memory.records.map((r) => r.id), ['z2']);
+});
+
+test('a stale sync cannot recreate memories cleared a moment earlier', async () => {
+  const dir = await tempDir();
+  const env = {MEMORY_API_TOKEN: TOKEN, MEMORY_DIR: dir};
+  const api = await listen(createApiServer(unconfigured, {memory: await createMemoryService(env)}));
+  try {
+    const saved = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {epoch: 0, records: [record('s1', 'Keep the chess board')]}});
+    assert.equal(saved.status, 200);
+    assert.equal(saved.data.epoch, 0);
+    const cleared = await api.call('/memory/clear', {method: 'POST', token: TOKEN, body: {confirm: CLEAR_CONFIRMATION}});
+    assert.equal(cleared.data.removed, 1);
+    assert.equal(cleared.data.epoch, 1);
+    const stale = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {epoch: 0, records: [record('s1', 'Keep the chess board')]}});
+    assert.equal(stale.status, 409);
+    assert.equal(stale.data.epoch, 1);
+    assert.equal((await api.call('/memory/status', {token: TOKEN})).data.count, 0);
+    const fresh = await api.call('/memory/records', {method: 'POST', token: TOKEN, body: {epoch: 1, records: [record('s2', 'A new note about rain')]}});
+    assert.equal(fresh.status, 200);
+    assert.equal((await api.call('/memory/status', {token: TOKEN})).data.count, 1);
+  } finally {
+    await api.close();
+    await rm(dir, {recursive: true, force: true});
+  }
 });
 
 test('learned memory prompt text is labeled as past records, not biography', () => {

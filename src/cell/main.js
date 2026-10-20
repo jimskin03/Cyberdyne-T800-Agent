@@ -1408,6 +1408,9 @@ function showLearnedStatus() {
     (st.tokenRequired
       ? 'Adapter needs the memory token. Saving in this browser until it is set. '
       : '') +
+    (st.capacity
+      ? 'This browser is full of memories waiting to sync. They stay until the adapter accepts them. '
+      : '') +
     'Learned memory: ' +
     where +
     (st.pending ? ` (${st.pending} waiting to sync)` : '') +
@@ -1432,16 +1435,27 @@ $('learned-forget').onclick = async () => {
   )
     return;
   const result = await learnedMemory.forget();
+  if (result?.error) {
+    const dropLocal = confirm(
+      `The adapter store was not cleared (${result.error}). Delete the copy in this browser anyway?`,
+    );
+    if (!dropLocal) {
+      showLearnedStatus();
+      $('learned-status').textContent =
+        'Learned memory kept in this browser. The adapter store was not cleared: ' + result.error;
+      return;
+    }
+    await learnedMemory.forget({localOnly: true});
+    showLearnedStatus();
+    $('learned-status').textContent =
+      'Browser copy deleted. The adapter store was not cleared: ' + result.error;
+    return;
+  }
   showLearnedStatus();
-  $('learned-status').textContent = result?.error
-    ? 'Browser copy deleted. The adapter store was not cleared: ' + result.error
-    : `Learned memory deleted (${result?.removed ?? 0} stored records).`;
+  $('learned-status').textContent =
+    `Learned memory deleted (${result?.removed ?? 0} stored records).`;
 };
 learnedMemory.refresh().then(showLearnedStatus);
-setInterval(() => {
-  if (document.hidden) return;
-  learnedMemory.flush().then(showLearnedStatus);
-}, 15000);
 function intercom(q) {
   if (!q || !state.started) return;
   const command = operatorCommand(q);
@@ -1712,7 +1726,17 @@ const app = createCellApp({
   state,
   tick,
   save,
+  intervals: [
+    {
+      ms: 15000,
+      fn: () => {
+        if (document.hidden) return;
+        learnedMemory.flush().then(showLearnedStatus);
+      },
+    },
+  ],
   teardown: [
+    () => learnedMemory.destroy(),
     () => settingsUI.destroy(),
     () => mcpUI.destroy(),
     () => computerUI.destroy(),

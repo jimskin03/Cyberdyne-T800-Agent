@@ -6,9 +6,10 @@ export const MAX_BATCH = 100;
 const ID = /^[A-Za-z0-9_-]{1,80}$/;
 const SCOPE = /^[a-z0-9-]{1,32}$/;
 const STOP = new Set(
-  'that this with have were what your from about remember session previous earlier before again happened feeling felt during could would being there last past them they then than when will just like into over some does said tell know'.split(
-    ' ',
-  ),
+  `that this with have were what your from about remember session previous earlier before again happened feeling felt during could would being there last past them they then than when will just like into over some does said tell know
+   the and for you are was but not can has had its our out all any who how why did her his she him get got let may too now off one new old see`
+    .split(/\s+/)
+    .filter(Boolean),
 );
 
 const fail = (status, message) => {
@@ -40,21 +41,33 @@ export function cleanBatch(body, now = Date.now()) {
   return {scope: cleanScope(body.scope), records: body.records.map((r) => cleanRecord(r, now))};
 }
 
+// Latin words of at least three letters, plus each Han character. Shorter
+// English words such as "cat" and acronyms such as "MCP" stay searchable.
+// A non-empty query that yields no terms is a search with no match, not a browse.
 export function queryTerms(query) {
-  return [...new Set(String(query || '').toLowerCase().match(/[a-z]{4,}/g) || [])]
-    .filter((word) => !STOP.has(word))
-    .slice(0, 12);
+  const text = String(query || '').toLowerCase().normalize('NFKC');
+  const terms = [];
+  for (const token of text.match(/\p{Script=Han}|[\p{L}\p{N}]{2,}/gu) || []) {
+    if (!/^\p{Script=Han}$/u.test(token) && (token.length < 3 || STOP.has(token))) continue;
+    terms.push(token);
+  }
+  return [...new Set(terms)].slice(0, 12);
 }
 
 // Shared by the file store, Turso and the browser fallback so results agree.
 export function rankRecords(records, query, {limit = 8, excludeSession = ''} = {}) {
-  const terms = queryTerms(query),
-    best = [];
+  const trimmed = String(query || '').trim();
+  const terms = queryTerms(trimmed);
+  const best = [];
   for (const record of records) {
     if (excludeSession && record.session === excludeSession) continue;
-    const text = String(record.text || '').toLowerCase();
-    const matches = terms.reduce((n, term) => n + (text.includes(term) ? 1 : 0), 0);
-    if (terms.length && !matches) continue;
+    let matches = 0;
+    if (trimmed) {
+      if (!terms.length) continue;
+      const text = String(record.text || '').toLowerCase();
+      matches = terms.reduce((n, term) => n + (text.includes(term) ? 1 : 0), 0);
+      if (!matches) continue;
+    }
     best.push({record, score: matches + (record.kind === 'intercom' || record.kind === 'say' ? 1 : 0)});
   }
   best.sort((a, b) => b.score - a.score || (b.record.at || 0) - (a.record.at || 0));

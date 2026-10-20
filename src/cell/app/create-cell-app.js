@@ -9,6 +9,7 @@ export function createCellApp({
   cancelFrame = (id) => cancelAnimationFrame(id),
   setIntervalFn = (fn, ms) => setInterval(fn, ms),
   clearIntervalFn = (id) => clearInterval(id),
+  intervals = [],
   teardown = [],
 } = {}) {
   let running = false;
@@ -16,14 +17,16 @@ export function createCellApp({
   let frameId = null;
   let hiddenTimer = null;
   let saveTimer = null;
+  const extraTimers = [];
 
   function frame(ms) {
-    if (!running) return;
+    if (!running || destroyed) return;
     try {
       tick(ms);
     } catch (error) {
       console.error(error);
     }
+    if (!running || destroyed) return;
     frameId = requestFrame(frame);
   }
 
@@ -45,6 +48,7 @@ export function createCellApp({
     running = true;
     hiddenTimer = setIntervalFn(tickHidden, 250);
     saveTimer = setIntervalFn(persist, 5000);
+    for (const item of intervals) extraTimers.push(setIntervalFn(item.fn, item.ms));
     window.addEventListener('pagehide', persist);
     frameId = requestFrame(frame);
   }
@@ -55,6 +59,8 @@ export function createCellApp({
     if (frameId != null) cancelFrame(frameId);
     if (hiddenTimer != null) clearIntervalFn(hiddenTimer);
     if (saveTimer != null) clearIntervalFn(saveTimer);
+    for (const id of extraTimers) clearIntervalFn(id);
+    extraTimers.length = 0;
     window.removeEventListener('pagehide', persist);
     frameId = hiddenTimer = saveTimer = null;
   }
