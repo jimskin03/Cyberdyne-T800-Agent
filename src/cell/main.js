@@ -4,6 +4,7 @@ import {createBodyLoadSampler} from './body-loads.js';
 import {createNervousHud} from './nervous-hud.js';
 import {recallSensoryMemory, describeMemory} from './sensory-memory.js';
 import {createSessionMemory} from './session-memory.js';
+import {createLearnedMemory} from './learned-memory.js';
 import {createId} from './id.js';
 import {createLifeMemory} from './life-memory.js';
 import lifeGraph from './default-brain.json';
@@ -135,6 +136,8 @@ const persistence = createPersistence('cell');
 const sessionStore = createCellSessionStore({storage: localStorage, persistence});
 const sessionMemory = createSessionMemory();
 const lifeMemory = createLifeMemory(lifeGraph);
+// Learned interactions live apart from the authored JSON Brain and survive Reset Session.
+const learnedMemory = createLearnedMemory();
 const nervous = createNervousSystem(),
   cognitive = createCognitiveState(),
   loadSampler = createBodyLoadSampler();
@@ -571,6 +574,7 @@ function journal(kind, text, details = {}) {
   sessionMemory.remember(kind, text, {feeling: context, session: activeSession});
   state.journal.push(entry);
   memoryOutbox.push(entry);
+  if (mind.online) learnedMemory.record(entry);
   if (state.journal.length > 200) state.journal.splice(0, state.journal.length - 200);
   if (kind !== 'heartbeat') stream(kind, text);
 }
@@ -856,10 +860,15 @@ async function think() {
         .map((e) => e.text)
         .join(' ') ||
       'pain cell';
-    const remembered = await recallSensoryMemory(recallQuery, {
-      signal: ac.signal,
-      session: activeSession,
-    });
+    const [remembered, learned] = await Promise.all([
+      recallSensoryMemory(recallQuery, {
+        signal: ac.signal,
+        session: activeSession,
+      }),
+      mind.online
+        ? learnedMemory.recall(recallQuery, {signal: ac.signal, session: activeSession})
+        : '',
+    ]);
     if (job !== state.thinking) return;
     const life = lifeMemory.recall(recallQuery, {
       conversation: job.consumed.some((e) => e.kind === 'intercom'),
@@ -881,6 +890,7 @@ async function think() {
           maxChars: 1800,
         },
         {name: 'Retrieved biography', text: life.prompt, priority: 60, maxChars: 2500},
+        {name: 'Learned memories', text: learned, priority: 50, maxChars: 1500},
         {name: 'Past recorded experiences', text: remembered, priority: 45, maxChars: 1500},
       ],
       {maxChars: intercomText ? INTERCOM_CONTEXT_CHARS : BACKGROUND_CONTEXT_CHARS},
@@ -1376,6 +1386,54 @@ undoReset.onclick = () => {
   stopForReset();
   if (sessionStore.restoreBackup()) location.reload();
 };
+// Learned memory: status, optional token for remote scenes, and a separate,
+// explicitly confirmed wipe. Reset session memory above never touches it.
+function showLearnedStatus() {
+  const st = learnedMemory.status;
+  const where =
+    st.backend === 'turso'
+      ? 'Turso cloud database'
+      : st.backend === 'local'
+        ? 'adapter files on this computer'
+        : 'this browser only';
+  $('learned-status').textContent =
+    (st.tokenRequired
+      ? 'Adapter needs the memory token. Saving in this browser until it is set. '
+      : '') +
+    'Learned memory: ' +
+    where +
+    (st.pending ? ` (${st.pending} waiting to sync)` : '') +
+    '.';
+  $('learned-token-row').hidden = !st.tokenRequired && !learnedMemory.hasToken();
+}
+$('learned-token').onchange = async () => {
+  learnedMemory.setToken($('learned-token').value);
+  $('learned-token').value = '';
+  await learnedMemory.refresh();
+  showLearnedStatus();
+};
+$('learned-forget').onclick = async () => {
+  const where =
+    learnedMemory.status.backend === 'turso'
+      ? 'the Turso cloud database and this browser'
+      : 'the adapter store and this browser';
+  if (
+    !confirm(
+      `Permanently delete all learned memories from ${where}? The JSON Brain and the current session are not changed. This cannot be undone.`,
+    )
+  )
+    return;
+  const result = await learnedMemory.forget();
+  showLearnedStatus();
+  $('learned-status').textContent = result?.error
+    ? 'Browser copy deleted. The adapter store was not cleared: ' + result.error
+    : `Learned memory deleted (${result?.removed ?? 0} stored records).`;
+};
+learnedMemory.refresh().then(showLearnedStatus);
+setInterval(() => {
+  if (document.hidden) return;
+  learnedMemory.flush().then(showLearnedStatus);
+}, 15000);
 function intercom(q) {
   if (!q || !state.started) return;
   const command = operatorCommand(q);

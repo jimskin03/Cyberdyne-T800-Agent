@@ -61,6 +61,7 @@ The issue #8 staged refactor split the former large modules into tested boundari
 | `src/cell/storage/` | Browser session persistence with reset and undo |
 | `src/cell/responsive-ui.*`, `panel-minimize.*`, `panel-drag.*` | Compact layout, panel minimize, and draggable JSON Brain |
 | `tools/api-server.mjs`, `tools/api/` | Backend CLI plus config, connection state, request validation, and upstream transport |
+| `src/cell/learned-memory.js`, `tools/memory/` | Learned (persistent) memory: browser client, token-protected `/memory` API, local file and Turso stores |
 | `test/`, `test/browser/` | Node tests and Playwright smoke tests with a mock LLM |
 
 ## Included brain and personalization
@@ -94,6 +95,40 @@ A static deployment (`dist/` on any web server) has no `/llm` backend, so the sc
 If the character does not answer, check the status below the chat input: **AI off** means AI mind is not selected, and **AI unavailable** means the backend is not reachable. Background thinking defaults to once every 30 wall-clock seconds, and direct questions take priority.
 
 When opening the scene over Tailscale or a private network, run the API backend on the scene-server machine. The included dev and preview proxies accept settings from the scene's current address and port without an `.env` origin setting. See [private network setup and connection errors](docs/API-INTEGRATION.md#using-the-scene-over-tailscale-or-another-private-network).
+
+## Persistent learned memory
+
+While **AI mind** is on, the agent saves its interactions (operator intercom messages, what it says, its notes and recorded pain) as *learned memory*. Later sessions recall the relevant ones and add them to the prompt as **Learned memories**, next to the JSON Brain's **Retrieved biography**. Learned memory is a separate layer: it never edits the brain JSON files, and the prompt labels it as past records, not biography or instructions.
+
+Storage, from most to least durable:
+
+| Where | When | Survives |
+| --- | --- | --- |
+| Turso (libSQL) cloud database | `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` are set where `npm run api` runs | Reloads, adapter restarts, other computers |
+| Local files, `saved-world/memory/learned-cell.jsonl` | Default when `npm run api` runs (zero config) | Reloads and adapter restarts |
+| This browser's `localStorage` | Only when the adapter isn't running or rejects the token | Reloads in the same browser |
+
+The browser keeps a copy of each record until the adapter acknowledges it, so records made while the adapter or Turso is down are sent later without duplicates. **Settings → Mind → Learned memory** shows where memory is currently saved.
+
+**Authentication.** Every `/memory` route on the adapter needs a bearer token. Set `MEMORY_API_TOKEN` in the adapter's environment or `.env` (at least 16 characters). If you leave it blank, the adapter creates a random token once and keeps it in `saved-world/memory/api-token`, an owner-only file, and it never prints the value. A browser on the same computer (`127.0.0.1` or `localhost`) gets the token from the dev or preview proxy automatically. A scene opened from somewhere else, like LAN, Tailscale or a tunnel, has to enter the token once under **Memory token**. That browser then keeps it in its own storage. The adapter still listens only on `127.0.0.1:18081`. Keep tokens in the environment where the backend runs. Don't paste them into chats or commit them.
+
+**Enabling Turso.**
+
+1. Create a database: `turso db create t800-memory`.
+2. Get its URL with `turso db show t800-memory --url` and a token with `turso db tokens create t800-memory`.
+3. Add both to the ignored `.env` on the machine that runs `npm run api`, as `TURSO_DATABASE_URL=libsql://…` and `TURSO_AUTH_TOKEN=…`. You can also export them in that shell.
+4. Restart `npm run api`. It logs `Learned memory: Turso cloud database` and creates the `learned_memory` table on first use.
+
+The credentials stay in the Node backend. The browser bundle never sees them. To go back to local files, remove both variables. Local files are not copied to Turso automatically.
+
+**Reset behavior.** **Reset session memory** clears only the current session's browser state, and **Restore previous session** still undoes it. Learned memory is kept. **Forget learned memory…** is a separate button. It asks for confirmation, then deletes the learned memories in this browser and in the adapter's store, which is either the local files or Turso. The adapter also rejects a clear request that doesn't include the explicit confirmation phrase.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MEMORY_API_TOKEN` | generated into `MEMORY_DIR/api-token` | Bearer token for `/memory` routes |
+| `MEMORY_DIR` | `saved-world/memory` | Local store and generated-token directory |
+| `TURSO_DATABASE_URL` | blank | `libsql://` or `https://` database URL; enables Turso with the token below |
+| `TURSO_AUTH_TOKEN` | blank | Turso database token |
 
 ## MCP outside data through the computer
 

@@ -98,6 +98,12 @@
  <label class="rowlabel">Clock <select id="timescale"><option value="1">real time</option><option value="10">1 min = 10 min</option><option value="60">1 min = 1 hour</option></select></label>
  <label class="rowlabel">Voice <select id="voice-sel"><option>loading…</option></select></label>
  <div class="control-row" style="margin-top:10px"><button id="forget">Wipe memory</button></div>
+ <p class="hint">Reset clears this session. Learned memories from earlier sessions are kept.</p>
+ <h3>Learned memory</h3>
+ <p id="learned-status" class="hint" role="status">Learned memory: checking…</p>
+ <label class="rowlabel" id="learned-token-row" hidden>Memory token <input id="learned-token" type="password" autocomplete="off" spellcheck="false" placeholder="MEMORY_API_TOKEN"></label>
+ <p class="hint">While the AI mind is on, conversations are saved by the adapter (local files, or Turso when configured) and recalled in later sessions. On this computer no token is needed; remote scenes enter the adapter's memory token once.</p>
+ <div class="control-row"><button id="learned-forget" type="button">Forget learned memory…</button></div>
  </section>
  <section id="mcp-settings" role="tabpanel" aria-labelledby="settings-mcp-tab" hidden>
   <h3>Computer connections</h3>
