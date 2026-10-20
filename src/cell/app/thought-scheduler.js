@@ -4,6 +4,7 @@ export function createThoughtScheduler({
   isOnline,
   isHidden = () => false,
   randomAction,
+  allowAutonomousMove = () => true,
   now = Date.now,
   schedule = (fn) => setTimeout(fn, 0),
 } = {}) {
@@ -37,6 +38,7 @@ export function createThoughtScheduler({
       return true;
     }
     if (
+      allowAutonomousMove() &&
       !state.current &&
       !state.queue.length &&
       !state.operatorBusy &&

@@ -67,7 +67,8 @@ export function createBody(world,cb){
  function moveSafely(dx,dz){const from=[st.x,st.z],to=[st.x+dx,st.z+dz];if(nav.segmentClear(from,to)){st.x=to[0];st.z=to[1];return true;}return false;}
  // ---------- commands (the action layer awaits these with until()) ----------
  function walkTo(x,z,speed=1){standUpNow();if(!st.rising&&nav.blocked(st.x,st.z)){const free=nav.closestFree(st.x,st.z);if(free)st.rising={from:[st.x,st.z],to:free,elapsed:0,recovery:true};}const start=st.rising?st.rising.to:[st.x,st.z],result=nav.route(start,[x,z]);st.navigation={...result,requested:[x,z],distanceTravelled:0,remaining:result.length||0,stalled:0,recovering:!!st.rising?.recovery};st.path=result.path;st.speed=Math.max(.1,Number(speed)||1);st.moving=result.status!=='failed';st.turnTo=null;st.look=null;return result.status!=='failed';}
- function stop(){st.path=[];st.rising=null;st.moving=false;if(st.navigation.status==='moving')st.navigation.status='cancelled';}
+ function stop(){st.path=[];st.rising=null;st.moving=false;st.manualDrive=null;if(st.navigation.status==='moving')st.navigation.status='cancelled';}
+ function drive(dx,dz,heading){st.manualDrive={dx,dz,heading};}
  function face(angle){st.look=null;st.turnTo=angle;}
  function facePoint(p){face(Math.atan2(p.x-st.x,p.z-st.z));}
  function lookAt(p,sec=3){st.look=p?p.clone():null;st.lookUntil=performance.now()/1000+sec;}
@@ -90,7 +91,14 @@ export function createBody(world,cb){
   if(st.external){root.position.set(st.x,st.external.y,st.z);root.rotation.set(st.external.rx,st.heading,st.external.rz);n.shL.rotation.z=1.8+Math.sin(t*18)*.5;n.shR.rotation.z=-1.8+Math.cos(t*19)*.5;n.hipL.rotation.x=Math.sin(t*15)*.7;n.hipR.rotation.x=-Math.sin(t*15)*.7;return;}
   // Turn toward the next exact collision-free segment before translating along it.
   const before=[st.x,st.z];let turning=0;
-  if(st.rising){st.rising.elapsed+=dt;const k=ease(st.rising.elapsed/.65);st.x=lerp(st.rising.from[0],st.rising.to[0],k);st.z=lerp(st.rising.from[1],st.rising.to[1],k);if(k>=1){st.rising=null;st.navigation.recovering=false;}}
+  const driveStep=st.manualDrive;st.manualDrive=null;
+  if(driveStep&&!st.rising&&st.posture==='stand'&&!st.seat){
+    st.heading=driveStep.heading;st.turnTo=null;st.path=[];st.look=null;
+    const {dx,dz}=driveStep;
+    if(dx||dz){if(!moveSafely(dx,dz)){if(!moveSafely(dx,0))moveSafely(0,dz);}}
+    st.moving=Math.hypot(st.x-before[0],st.z-before[1])>1e-4;
+    if(st.navigation.status==='moving')st.navigation.status='cancelled';
+  }else if(st.rising){st.rising.elapsed+=dt;const k=ease(st.rising.elapsed/.65);st.x=lerp(st.rising.from[0],st.rising.to[0],k);st.z=lerp(st.rising.from[1],st.rising.to[1],k);if(k>=1){st.rising=null;st.navigation.recovering=false;}}
   else if(st.posture==='stand'&&st.path.length){
    const [tx,tz]=st.path[0],dx=tx-st.x,dz=tz-st.z,dist=Math.hypot(dx,dz);
    if(dist<1e-5){st.path.shift();if(!st.path.length){st.moving=false;st.navigation.status='arrived';st.navigation.remaining=0;}}
@@ -164,6 +172,6 @@ export function createBody(world,cb){
   const post={stand:st.moving?'walking':'standing',crouch:'crouching',half:'bending down',sit:'sitting'+(st.seat?' on '+st.seat.name:''),floor:'sitting on the floor, knees pulled up',lie:'lying on '+(st.lieOn==='bed'?'the bed':'the floor')}[st.posture];
   return {facing,near,posture:st.external?'suspended or tumbling through the room':post,holding:st.holding?st.holding.name:'nothing',x:st.x.toFixed(1),z:st.z.toFixed(1)};
  }
- return {st,walkTo,stop,face,facePoint,lookAt,gesture,clearGesture,setPosture,standUpNow,grab,release,placeAt,handPos,flinch,describe,blocked,freeSpotNear,facingErr,
+ return {st,walkTo,stop,drive,face,facePoint,lookAt,gesture,clearGesture,setPosture,standUpNow,grab,release,placeAt,handPos,flinch,describe,blocked,freeSpotNear,facingErr,
   get navigation(){return st.navigation;},get arrived(){return !st.path.length&&!st.rising;},get turned(){return st.turnTo==null;}};
 }

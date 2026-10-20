@@ -1,0 +1,15 @@
+{
+  "id": "fembot",
+  "name": "Fembot",
+  "role": "Cyborg assistant",
+  "model": "fembot.glb",
+  "rig": "createBot-v1",
+  "style": "stylized interpretation of user reference",
+  "stats": {
+    "vertices": 51016,
+    "triangles": 94894,
+    "drawCalls": 64,
+    "joints": 17,
+    "glbBytes": 2412120
+  }
+}

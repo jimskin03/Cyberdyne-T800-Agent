@@ -28,6 +28,7 @@ The offline scene also supports ordinary HTTP origins when hosted on another dev
 - **Desktop:** the **−** button on JSON Brain, Mind Stream, Thoughts, or Dialogue minimizes that panel independently, leaving its title or label visible; **+** restores it. Minimizing keeps the conversation, settings, and memory selection, and the intercom stays available. To move the JSON Brain box, drag its title bar (no hold needed; the minimize button stays clickable). You can also focus the title bar and use the arrow keys, or press **Home** to reset its position.
 - **Phones and short landscape screens:** **Controls** opens the physical operator controls, and **Memory** opens the interactive JSON brain. **Settings** in the top bar opens the Mind and MCP tabs on every screen size. Each panel scrolls and has a **Close** button (Escape also closes it). Selecting a tool closes Controls so you can tap the unit.
 - **Keyboard:** 1–8 arm a tool, G grapple, C his computer, V swap POV, P punk, B baby, M mute, H hide UI.
+- **Play:** **Play as Fembot** in the operator controls walks her in the cell. WASD moves, hold the right mouse button to look, Shift sprints, and Esc returns movement to the agent. **Character appearance** can switch the mesh back to the T-800 for this page session. The authored JSON brain and agent name stay in place.
 
 ## Commands
 
@@ -52,6 +53,7 @@ The issue #8 staged refactor split the former large modules into tested boundari
 | Path | Responsibility |
 | --- | --- |
 | `src/cell/main.js` | Scene entry point that wires the modules together |
+| `src/characters/fembot.js`, `public/characters/fembot/` | Fembot skin on the existing rig, with direct cell control |
 | `src/cell/app/` | App lifecycle, thought scheduling, action queue, speech coordination |
 | `src/cell/ai/` | Service-neutral LLM client, connection state, prompts, parsers, creative generation |
 | `src/cell/actions/` | Shared supported-action catalog and explicit action results (`completed`, `blocked`, `unavailable`, `cancelled`, `failed`) |

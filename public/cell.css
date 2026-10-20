@@ -107,6 +107,9 @@ body.clean #lab,body.clean header,body.clean footer,body.clean .topline,body.cle
 #luna-panel{position:fixed;left:306px;bottom:45px;width:210px;z-index:4;padding:10px;background:#191621eb;border:1px solid #c7a5ff66;border-radius:6px;font:9px/1.5 var(--mono)}#luna-title{display:block;color:#dfc6ff;font-size:11px}#luna-status{display:block;color:#ab9ab8;margin:5px 0}#luna-line{display:block;color:#f0e3ff;font:11px/1.4 'DM Sans',sans-serif;max-height:100px;overflow:auto;margin-top:5px}#luna-toggle{padding:4px 8px;font-size:10px;border-color:#c7a5ff66}body.clean #luna-panel{display:none}
 @media(max-width:1550px){#luna-panel{left:300px;width:190px;bottom:270px}}
 @media(max-width:1100px){#luna-panel{left:12px;bottom:250px;width:190px}}
+#fembot-play{width:100%;margin-top:8px}
+#fembot-hud{position:fixed;bottom:52px;left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:14px;align-items:center;max-width:calc(100vw - 32px);padding:10px 16px;background:#101820ee;border:1px solid #8fd0ff88;border-radius:8px;color:#e7f6ff;font:12px/1.4 var(--mono)}
+#fembot-hud[hidden]{display:none}#fembot-hud b{letter-spacing:.14em;color:#9ad7ff}
 
 #nervous-panel{font:10px/1.45 var(--mono);margin-bottom:14px;border:1px solid #5fdcc955;padding:8px}#nervous-panel summary{cursor:pointer;color:#9eeedc;font-weight:bold}.nerve-legend{color:#acb5bd;font-size:8px;margin:6px 0}#nerve-rows{max-height:220px;overflow:auto}.nerve-row{padding:5px 0;border-bottom:1px solid #ffffff12}.nerve-row span,.nerve-row small{display:block}.nerve-row small{font-size:8px;color:#a7bdb6}.nerve-row progress{width:100%;height:4px;accent-color:#66d6ac}.nerve-row[data-level="severe"],.nerve-row[data-level="overwhelming"]{color:#ff8f77}#nerve-insanity{width:100%;height:6px;accent-color:#bb83e8}#nerve-perception{color:#d4adf4;margin:5px 0}#nerve-storage{font-size:8px;margin-top:6px}
 

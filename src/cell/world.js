@@ -2,6 +2,7 @@ import * as T from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {Reflector} from 'three/addons/objects/Reflector.js';
 import {createBot} from '../bot.js';
+import {installCharacterSelector} from '../characters/fembot.js';
 import {TOOLS,buildTool} from '../tools.js';
 import {S,ROOM,FEATURES,RECTS,CIRCLES} from './world/definition.js';
 import {POV_CAPTURE_WIDTH,POV_CAPTURE_HEIGHT,canonicalPov,createCaptureQueue} from './world/capture.js';
@@ -228,6 +229,7 @@ export function createWorld(container,cb){
  // ---------- the unit ----------
  let poseFn=null;
  const bot=createBot(toon,{free:true,eyeScale:.08,pose:(t,dt)=>poseFn&&poseFn(t,dt)});bot.root.scale.setScalar(S);bot.root.rotation.order='YXZ';scene.add(bot.root);
+ const character=installCharacterSelector(bot);
  bot.root.traverse(o=>{if(o.isPointLight){o.distance=1.6;o.position.z=.6;}});
 
  // ---------- loose things he can pick up ----------
@@ -443,7 +445,7 @@ export function createWorld(container,cb){
  function destroy(){
   captures.cancelAll();removeEventListener('resize',resize);renderer.domElement.removeEventListener('pointerdown',pointerDown);renderer.domElement.removeEventListener('pointerup',pointerUp);insetEl?.removeEventListener('click',insetClick);controls.dispose?.();captureTarget.dispose();renderer.dispose();
  }
- return {scene,renderer,camera,pov,controls,bot,items,features:FEATURES,update,strike,cancelStrike,capture,visible,surfaceAt,pushItems,knockItems,addCreation,breakItem,repairItem,placeSpot,get debris(){return debris;},
+ return {scene,renderer,camera,pov,controls,bot,character,items,features:FEATURES,update,strike,cancelStrike,capture,visible,surfaceAt,pushItems,knockItems,addCreation,breakItem,repairItem,placeSpot,get debris(){return debris;},
   chalkDraw,chalkText,chalkSet,chalkPen,chalkErase,chalkExport,chalkImport,surfaceInfo,surfaceIds:Object.keys(SURF_DEF),get chalkDescription(){return chalkDescribe();},
   setTime,birdLand,perchedBird,addMark,marks,burst,ring,emit:rawEmit,setPose(fn){poseFn=fn;},
   photoSurfaces:()=>Object.values(surfaces).filter(sf=>sf.marks.length).map(sf=>({id:sf.id,name:sf.name,canvas:sf.cv,width:sf.W,height:sf.H,marks:sf.marks})),

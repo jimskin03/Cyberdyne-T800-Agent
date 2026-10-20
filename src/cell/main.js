@@ -11,6 +11,7 @@ import {createBerserker} from './berserker.js';
 import './berserker.css';
 import * as T from 'three';
 import {createWorld} from './world.js';
+import {bindFembotPlay} from '../characters/fembot.js';
 import {createBody} from './body.js';
 import {createActions, INTERRUPT} from './actions.js';
 import {createMind, wantsFreshVision} from './mind.js';
@@ -90,6 +91,7 @@ const FEEL = {
 };
 const state = {
   started: false,
+  playerControl: false,
   pain: 0,
   fear: 12,
   despair: 6,
@@ -241,7 +243,7 @@ const mcp = createMcpClient({
     !!body && !!actions && body.st.posture === 'sit' && body.st.seat === actions.SEATS.stool,
 });
 const slop = createSlop();
-let world, body, actions, grapple, waterMode, peace, climate, berserker;
+let world, body, actions, grapple, waterMode, peace, climate, berserker, fembotPlay;
 const inPeace = () => !!peace?.active;
 function restorePosition(w) {
   if (!w || !body) return;
@@ -973,6 +975,7 @@ thoughtScheduler = createThoughtScheduler({
   isOnline: () => mind.online,
   isHidden: () => document.hidden,
   randomAction,
+  allowAutonomousMove: () => !state.playerControl,
 });
 
 const wordsOf = (s) =>
@@ -1033,6 +1036,10 @@ function apply(d, urgent = false, model = true, priority = urgent ? 'intercom' :
     save();
     return;
   } // He can express pain while his hands keep following the operator's task.
+  if (state.playerControl) {
+    save();
+    return;
+  }
   state.queue =
     model && priority !== 'intercom' && !lifeMemory.graph.behavior
       ? [randomAction()]
@@ -1069,7 +1076,8 @@ const actionQueue = createActionQueue({
   describeAction: actText,
   formatTime: hh,
   save,
-  isBlocked: () => !!berserker?.active || !!waterMode?.active || !!grapple?.active,
+  isBlocked: () =>
+    !!state.playerControl || !!berserker?.active || !!waterMode?.active || !!grapple?.active,
   onDoing: (text) => {
     $('doing').textContent = text;
   },
@@ -1388,8 +1396,12 @@ function intercom(q) {
     else if (!mind.st.online) toast('AI is unavailable. Start a configured brain service.');
     return;
   }
-  if (waterMode?.active) waterMode.exit();
   const decision = Array.isArray(command) ? {actions: command} : command;
+  if (state.playerControl && decision.actions?.length) {
+    toast('Press Esc to hand movement back before that order can run.');
+    return;
+  }
+  if (waterMode?.active) waterMode.exit();
   for (const a of decision.actions)
     if ((a.target || a.object) && !actions.resolve(a.target || a.object)) {
       toast('No such target in this cell: ' + (a.target || a.object));
@@ -1455,6 +1467,7 @@ $('restore-ui').onclick = toggleUI;
 addEventListener('keydown', (e) => {
   if (
     berserker?.active ||
+    state.playerControl ||
     e.repeat ||
     e.ctrlKey ||
     e.altKey ||
@@ -1621,6 +1634,7 @@ function tick(ms) {
   world.setTime((state.simMin % 1440) / 60, state.weather);
   speechCoordinator.flushPending();
   grapple?.update(t, dt);
+  fembotPlay?.update(dt);
   berserker?.update(t, dt);
   actions.tick(t);
   waterMode?.update(t, dt);
@@ -1874,6 +1888,29 @@ berserker = createBerserker(world, body, grapple, {
   },
 });
 $('berserker-enter').onclick = () => berserker.enter($('berserker-character').value);
+fembotPlay = bindFembotPlay(world.character, body, world, {
+  allowed: () =>
+    state.started &&
+    !berserker?.active &&
+    !waterMode?.active &&
+    !grapple?.active &&
+    !inPeace() &&
+    !body.st.external,
+  keepCamera: () => !!berserker?.active,
+  toast,
+  onEnter() {
+    actions.cancelAll();
+    state.queue = [];
+    state.current = null;
+    state.operatorBusy = false;
+    state.playerControl = true;
+    body.stop();
+    body.standUpNow();
+  },
+  onExit() {
+    state.playerControl = false;
+  },
+});
 window.__CELL = {
   mcp,
   nervous,
