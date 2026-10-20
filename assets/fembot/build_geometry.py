@@ -30,9 +30,11 @@ MATERIALS = {
     'iris': {'color': [.035, .18, .19], 'roughness': .2, 'metallic': .1},
     'black': {'color': [.004, .006, .01], 'roughness': .3, 'metallic': 0},
 }
+# Head y is the fembot neck length. createBot keeps the longer T-800 neck at
+# y=.78; attachFembot copies this translation onto the host while the skin is on.
 RIG = {
     'body': [None, [0, 0, 0]], 'torso': ['body', [0, 2.05, 0]],
-    'neck': ['torso', [0, .55, .02]], 'head': ['neck', [0, .78, .05]],
+    'neck': ['torso', [0, .55, .02]], 'head': ['neck', [0, .50, .05]],
     'jaw': ['head', [0, -.18, .12]],
 }
 for s, side in [(-1, 'L'), (1, 'R')]:
@@ -145,9 +147,10 @@ for s in [-1,1]:
     for i in range(4):
         curve('Face framing lock','head','gold' if i%2 else 'highlight',[[s*(.12+i*.016),.56,.22],[s*(.30+i*.014),.36,.29],[s*(.33+i*.018),.02,.19],[s*(.39-i*.009),-.20,.12],[s*.31,-.38,.19]],.012+i*.001,32)
 
-# Neck, torso plates and back electronics.
-shell('Neck alloy','neck','chrome',[(.04,.15,.13,0),(.18,.17,.14,0),(.43,.16,.14,0),(.56,.13,.13,0)])
-for y in [.10,.18,.26,.34,.42]:
+# Short column from the collar to just under the jaw. The old stack ran to
+# y=.56 under a head pivot at y=.78, about twice a plausible neck.
+shell('Neck alloy','neck','chrome',[(.02,.150,.130,0),(.10,.165,.142,0),(.19,.158,.136,0),(.28,.132,.116,0)])
+for y in [.08,.15,.22]:
     curve('Neck seal','neck','edge',[[.158*sin(a),y,.145*cos(a)] for a in [i*2*PI/32 for i in range(33)]],.008,32)
 shell('Body undersuit','torso','rubber',[(-.79,.43,.27,0),(-.55,.35,.24,0),(-.2,.38,.26,0),(.18,.55,.30,0),(.43,.56,.22,0),(.54,.20,.16,0)])
 shell('Abdominal shell','torso','chrome',[(-.73,.38,.27,.025),(-.48,.32,.27,.025),(-.16,.37,.28,.025),(.09,.50,.29,.02)],-.98,.98)

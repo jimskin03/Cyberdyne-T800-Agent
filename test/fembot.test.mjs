@@ -41,6 +41,38 @@ test('Fembot loads and inherits the original joints, animation callback and hit 
   skin.dispose();
 });
 
+function jointExtentY(bot, joint) {
+  let min = Infinity, max = -Infinity;
+  for (const mesh of bot.pickables) {
+    if (mesh.userData.hostJoint !== joint) continue;
+    const attr = mesh.geometry.attributes.position;
+    for (let i = 0; i < attr.count; i++) {
+      const y = attr.getY(i);
+      if (y < min) min = y;
+      if (y > max) max = y;
+    }
+  }
+  return {min, max};
+}
+
+test('Fembot neck is short enough for the jaw to meet the collar', async () => {
+  const bot = createBot(toon, {free: true});
+  const hostNeck = bot.nodes.head.position.y;
+  const skin = attachFembot(bot, (await load()).scene);
+  skin.setEnabled(true);
+  const neck = jointExtentY(bot, 'neck');
+  const head = jointExtentY(bot, 'head');
+  const headBase = bot.nodes.head.position.y;
+  assert.ok(headBase < hostNeck - 0.2, `head pivot ${headBase} did not drop from ${hostNeck}`);
+  assert.ok(neck.min < 0.08, 'neck should start at the collar');
+  assert.ok(neck.max < 0.4, `neck column still reaches ${neck.max}`);
+  assert.ok(headBase + head.min < neck.max, 'gap between the neck and the head');
+  assert.ok(neck.max < headBase - 0.12, 'neck crosses the jaw into the face');
+  skin.setEnabled(false);
+  assert.equal(bot.nodes.head.position.y, hostNeck);
+  skin.dispose();
+});
+
 test('Fembot mesh follows the existing ragdoll and its restore operation', async () => {
   const bot = createBot(toon, {free:true});
   bot.root.scale.setScalar(.38);bot.root.position.y=.91*.38;

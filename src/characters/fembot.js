@@ -38,6 +38,15 @@ export function attachFembot(bot, gltfScene) {
   }
   const originalUpdate = bot.update;
   let enabled = false;
+  // createBot's head pivot is the long T-800 neck. This skin's pivot is shorter.
+  const authoredHead = gltfScene.getObjectByName('aixiin_head');
+  const hostHead = bot.nodes.head;
+  const restHeadY = hostHead.position.y;
+  function fembotNeckLength() {
+    const y = authoredHead?.position.y;
+    if (!Number.isFinite(y) || y < 0.25 || y > restHeadY) return restHeadY;
+    return y;
+  }
   const enforce = () => {
     if (enabled) for (const [object] of originals) object.visible = false;
   };
@@ -48,6 +57,7 @@ export function attachFembot(bot, gltfScene) {
   };
   function setEnabled(value) {
     enabled = !!value;
+    hostHead.position.y = enabled ? fembotNeckLength() : restHeadY;
     for (const group of groups) group.visible = enabled;
     for (const [object, visible] of originals) object.visible = enabled ? false : visible;
     bot.pickables.splice(0, bot.pickables.length, ...(enabled ? pickables : originalPickables));
