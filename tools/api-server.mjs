@@ -9,10 +9,11 @@ import {validateChatRequest} from './api/request-validation.mjs';
 import {requestUpstream} from './api/upstream.mjs';
 import {requestModels} from './api/models.mjs';
 import {createMcpGateway, McpError} from './mcp/gateway.mjs';
+import {createMemoryService,handleMemoryRequest} from './memory/service.mjs';
 
 export {agentLabel,apiConfiguration,operatorConnection} from './api/config.mjs';
 
-export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcurrent=3,oauthOptions={},mcpOptions={}}={}){
+export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcurrent=3,oauthOptions={},mcpOptions={},memory=null}={}){
  let active=0;
  const oauth=config.authMode==='oauth'&&config.oauth?createOAuth(config.oauth,{fetcher,...oauthOptions}):null;
  const connections=createConnectionState(config,oauth);
@@ -32,6 +33,7 @@ export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcur
    return;
   }
   if(!guardLocalRequest(req,res,{allowedOrigins:config.allowedOrigins||[]}))return;
+  if(await handleMemoryRequest(req,res,pathname,memory))return;
   if(req.method==='GET'&&pathname==='/mcp')return send(200,mcp.status());
   if(req.method==='POST'&&['/mcp/connection','/mcp/action'].includes(pathname)){
    if(active>=maxConcurrent)return send(429,{error:'Adapter is busy. Retry later.'});
@@ -89,13 +91,18 @@ export function createApiServer(config,{fetcher=fetch,timeoutMs=120000,maxConcur
   }catch(error){send(error.status||(controller.signal.aborted?504:502),{error:error.status?error.message:controller.signal.aborted?'Provider request timed out.':'API adapter request failed.',...(!error.status?{code:controller.signal.aborted?'provider_timeout':'provider_request_failed'}:{})});}
   finally{clearTimeout(timer);res.off('close',cancel);active--;}
  });
- server.on('close',()=>{void mcp.disconnect();});
+ server.on('close',()=>{void mcp.disconnect();memory?.store?.close?.();});
  return server;
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{
   const config=apiConfiguration();
-  createApiServer(config).listen(18081,'127.0.0.1',()=>console.log(config.configured===false?'Cell API adapter listening on loopback port 18081. No API configured; add one from the scene.':'Cell API adapter listening on loopback port 18081.'));
+  const memory=await createMemoryService();
+  createApiServer(config,{memory}).listen(18081,'127.0.0.1',()=>{
+   console.log(config.configured===false?'Cell API adapter listening on loopback port 18081. No API configured; add one from the scene.':'Cell API adapter listening on loopback port 18081.');
+   // Report where memory lives, never the token value.
+   console.log(`Learned memory: ${memory.backend==='turso'?'Turso cloud database':'local files in '+memory.directory}; token from ${memory.tokenSource==='env'?'MEMORY_API_TOKEN':'an owner-only file in the memory directory'}.`);
+  });
  }
  catch(error){console.error(error.message);process.exitCode=1;}
 }
