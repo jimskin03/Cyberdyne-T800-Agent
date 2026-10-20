@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp, rm, stat, readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {createClient} from '@libsql/client';
 import {createApiServer} from '../tools/api-server.mjs';
 import {createLocalMemoryStore} from '../tools/memory/local-store.mjs';
 import {createTursoMemoryStore} from '../tools/memory/turso-store.mjs';
@@ -72,6 +73,10 @@ test('local file store deduplicates, survives a restart and clears only on reque
     const afterClear = createLocalMemoryStore(dir);
     assert.equal(await afterClear.count('cell'), 0);
     assert.equal(await afterClear.epoch('cell'), 1);
+    const staleWrite = await afterClear.add('cell', [record('m1', 'Operator asked about the thermostat')], {epoch: 0});
+    assert.equal(staleWrite.conflict, true);
+    assert.equal(staleWrite.epoch, 1);
+    assert.equal(await afterClear.count('cell'), 0);
   } finally {
     await rm(dir, {recursive: true, force: true});
   }
@@ -101,7 +106,7 @@ test('Turso store uses parameterized SQL against an injected client', async () =
   assert.equal(store.backend, 'turso');
   assert.equal((await store.add('cell', [record('t1', "it's O'Brien; DROP TABLE x")])).stored, 1);
   assert.match(calls[0].batch[0], /CREATE TABLE IF NOT EXISTS learned_memory/);
-  const insert = calls[1].batch[0];
+  const insert = calls[1].batch[1];
   assert.match(insert.sql, /INSERT OR IGNORE/);
   assert.equal(insert.args[4], "it's O'Brien; DROP TABLE x");
   const found = await store.recall('cell', 'thermostat', {excludeSession: 'now'});
@@ -522,6 +527,75 @@ test('another browser cannot restore memories deleted elsewhere, including after
     assert.equal((await api.call('/memory/status', {token: TOKEN})).data.count, 1);
   } finally {
     await api?.close();
+    await rm(dir, {recursive: true, force: true});
+  }
+});
+
+test('refresh drops synchronized copies after a remote deletion so offline recall cannot return them', async () => {
+  let serverEpoch = 0;
+  let online = true;
+  const fetcher = async (url, init = {}) => {
+    if (!online) throw new TypeError('offline');
+    const body = init.body ? JSON.parse(init.body) : null;
+    if (String(url).includes('/records')) {
+      if (body.epoch !== serverEpoch) return Response.json({code: 'memory_stale', error: 'Memory sync is stale.', epoch: serverEpoch}, {status: 409});
+      return Response.json({backend: 'local', stored: body.records.length, acknowledged: body.records.map((r) => r.id), epoch: serverEpoch});
+    }
+    if (String(url).includes('/recall')) return Response.json({backend: 'local', records: [], epoch: serverEpoch});
+    return Response.json({available: true, backend: 'local', count: 0, epoch: serverEpoch});
+  };
+  const memory = createLearnedMemory({storage: memoryStorage(), fetcher});
+  memory.record({id: 'synced', kind: 'note', text: 'The towel was folded on the chair.', at: 4});
+  assert.equal(await memory.flush(), 1);
+  memory.record({id: 'pending', kind: 'note', text: 'A note still waiting in this browser.', at: 5});
+  serverEpoch = 1;
+  const status = await memory.refresh();
+  assert.equal(status.epoch, 1);
+  assert.equal(memory.status.conflict, true);
+  assert.equal(memory.status.remoteCleared, true);
+  assert.deepEqual(memory.records.map((r) => r.id), ['pending']);
+  assert.equal(memory.records[0].held, true);
+  online = false;
+  assert.equal(await memory.recall('towel'), '');
+  assert.match(await memory.recall('waiting'), /A note still waiting in this browser/);
+
+  const syncedOnly = createLearnedMemory({storage: memoryStorage(), fetcher});
+  online = true;
+  serverEpoch = 0;
+  syncedOnly.record({id: 'old', kind: 'note', text: 'The towel was folded on the chair.', at: 4});
+  assert.equal(await syncedOnly.flush(), 1);
+  serverEpoch = 1;
+  await syncedOnly.refresh();
+  assert.equal(syncedOnly.records.length, 0);
+  assert.equal(syncedOnly.status.conflict, false);
+  assert.equal(syncedOnly.status.remoteCleared, true);
+  online = false;
+  assert.equal(await syncedOnly.recall('towel'), '');
+});
+
+test('a shared libsql file rejects a write from a generation another connection already cleared', async () => {
+  const dir = await tempDir();
+  const clientA = createClient({url: 'file:' + join(dir, 'memory.db')});
+  const clientB = createClient({url: 'file:' + join(dir, 'memory.db')});
+  const storeA = await createTursoMemoryStore({client: clientA});
+  const storeB = await createTursoMemoryStore({client: clientB});
+  try {
+    assert.equal((await storeA.add('cell', [record('s1', 'Keep the chess board')], {epoch: 0})).conflict, false);
+    const cleared = await storeB.clear('cell');
+    assert.equal(cleared.epoch, 1);
+    assert.equal(await storeA.count('cell'), 0);
+    const stale = await storeA.add('cell', [record('s1', 'Keep the chess board')], {epoch: 0});
+    assert.equal(stale.conflict, true);
+    assert.equal(stale.epoch, 1);
+    assert.equal(stale.stored, 0);
+    assert.equal(await storeB.count('cell'), 0);
+    assert.equal((await storeB.recall('cell', 'chess')).length, 0);
+    const fresh = await storeA.add('cell', [record('s2', 'A note made after the clear')], {epoch: 1});
+    assert.equal(fresh.conflict, false);
+    assert.equal(await storeB.count('cell'), 1);
+  } finally {
+    clientA.close();
+    clientB.close();
     await rm(dir, {recursive: true, force: true});
   }
 });

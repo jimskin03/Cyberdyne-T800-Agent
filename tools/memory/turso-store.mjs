@@ -33,20 +33,34 @@ export async function createTursoMemoryStore({url, authToken, client = null} = {
   }));
   return {
     backend: 'turso',
-    async add(scope, records) {
+    async add(scope, records, {epoch} = {}) {
       scope = cleanScope(scope);
       await init();
-      if (!records.length) return {stored: 0, acknowledged: []};
-      const storedAt = Date.now();
+      const guarded = Number.isInteger(epoch);
+      // One write transaction reads the generation and inserts. A clear on
+      // another adapter commits before this batch or after it, not between the two.
       const results = await client.batch(
-        records.map((r) => ({
-          sql: 'INSERT OR IGNORE INTO learned_memory (id, scope, session, kind, text, at, stored_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          args: [r.id, scope, r.session, r.kind, r.text, r.at, storedAt],
-        })),
+        [
+          {
+            sql: 'SELECT COALESCE((SELECT epoch FROM learned_memory_epoch WHERE scope = ?), 0) AS epoch',
+            args: [scope],
+          },
+          ...records.map((r) => ({
+            sql: `INSERT OR IGNORE INTO learned_memory (id, scope, session, kind, text, at, stored_at)
+              SELECT ?, ?, ?, ?, ?, ?, ?
+              WHERE ${guarded ? 'COALESCE((SELECT epoch FROM learned_memory_epoch WHERE scope = ?), 0) = ?' : '1'}`,
+            args: guarded
+              ? [r.id, scope, r.session, r.kind, r.text, r.at, Date.now(), scope, epoch]
+              : [r.id, scope, r.session, r.kind, r.text, r.at, Date.now()],
+          })),
+        ],
         'write',
       );
-      const stored = results.reduce((n, result) => n + Number(result?.rowsAffected || 0), 0);
-      return {stored, acknowledged: records.map((r) => r.id)};
+      const value = Number(results[0]?.rows?.[0]?.epoch);
+      const current = Number.isInteger(value) && value >= 0 ? value : 0;
+      if (guarded && epoch !== current) return {conflict: true, epoch: current, stored: 0, acknowledged: []};
+      const stored = results.slice(1).reduce((n, result) => n + Number(result?.rowsAffected || 0), 0);
+      return {conflict: false, epoch: current, stored, acknowledged: records.map((r) => r.id)};
     },
     async recall(scope, query, {limit = 8, excludeSession = ''} = {}) {
       scope = cleanScope(scope);

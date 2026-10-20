@@ -34,7 +34,7 @@ export function createLearnedMemory({
   let epochSeen = saved.epoch;
   let closed = false;
   const recallAborts = new Set();
-  const status = {backend: 'browser', available: false, tokenRequired: false, pending: 0, capacity: false, conflict: false, held: 0, error: ''};
+  const status = {backend: 'browser', available: false, tokenRequired: false, pending: 0, capacity: false, conflict: false, held: 0, remoteCleared: false, error: ''};
   const persist = () => {
     // Drop the oldest synced copy first. Records the adapter has not accepted stay put.
     while (records.length > localLimit) {
@@ -90,6 +90,23 @@ export function createLearnedMemory({
     if (String(init.method || 'GET').toUpperCase() === 'POST' && Number.isInteger(data.epoch) && data.epoch >= 0) epochSeen = data.epoch;
     return data;
   }
+  // A newer generation means another browser deleted learned memory. Copies this
+  // browser already synchronized belong to that deleted generation. Copies still
+  // waiting for an acknowledgement stay for an explicit upload or discard.
+  function noteRemoteGeneration(serverEpoch) {
+    if (!Number.isInteger(serverEpoch) || serverEpoch < 0) return;
+    if (serverEpoch === epochSeen) {
+      status.remoteCleared = false;
+      return;
+    }
+    if (serverEpoch < epochSeen) return;
+    if (records.some((r) => r.synced)) {
+      records = records.filter((r) => !r.synced);
+      status.remoteCleared = true;
+    }
+    if (!records.some((r) => !r.synced && !r.held)) epochSeen = serverEpoch;
+    persist();
+  }
   function linkedSignal(signal, timeoutMs) {
     const controller = new AbortController();
     recallAborts.add(controller);
@@ -129,6 +146,7 @@ export function createLearnedMemory({
           // Someone deleted learned memory. Keep these copies for an explicit
           // upload or discard, and do not send them again under the new generation.
           if (error.status === 409 && Number.isInteger(error.epoch) && error.epoch >= 0) {
+            noteRemoteGeneration(error.epoch);
             for (const record of records) if (!record.synced) record.held = true;
             epochSeen = error.epoch;
             persist();
@@ -177,6 +195,7 @@ export function createLearnedMemory({
       const linked = linkedSignal(signal, 3000);
       try {
         const data = await call('/status?scope=' + scope, {signal: linked.signal});
+        noteRemoteGeneration(data?.epoch);
         await flush({signal: linked.signal});
         return data;
       } catch {
@@ -195,6 +214,7 @@ export function createLearnedMemory({
         const params = new URLSearchParams({scope, q: String(query || '').slice(0, 800), limit: String(limit)});
         if (session) params.set('excludeSession', session);
         const data = await call('/recall?' + params, {signal: linked.signal});
+        noteRemoteGeneration(data?.epoch);
         found = Array.isArray(data.records) ? data.records : [];
       } catch (error) {
         if (closed || signal?.aborted || error?.name === 'AbortError') return '';

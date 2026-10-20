@@ -1411,6 +1411,11 @@ function showLearnedStatus() {
       `Learned memory was deleted somewhere else. ${st.held} ${st.held === 1 ? 'copy stays' : 'copies stay'} in this browser until you upload or discard them.`;
     return;
   }
+  if (st.remoteCleared) {
+    $('learned-status').textContent =
+      'Learned memory was deleted somewhere else. Saved copies in this browser were removed.';
+    return;
+  }
   $('learned-status').textContent =
     (st.tokenRequired
       ? 'Adapter needs the memory token. Saving in this browser until it is set. '

@@ -68,26 +68,33 @@ export async function handleMemoryRequest(req, res, pathname, memory) {
       const query = String(url.searchParams.get('q') || '').slice(0, 800);
       const limit = Math.max(1, Math.min(20, Number(url.searchParams.get('limit')) || 8));
       const excludeSession = String(url.searchParams.get('excludeSession') || '').slice(0, 80);
-      send(200, {backend: memory.store.backend, records: await memory.store.recall(scope, query, {limit, excludeSession})});
+      send(200, {
+        backend: memory.store.backend,
+        epoch: await memory.store.epoch(scope),
+        records: await memory.store.recall(scope, query, {limit, excludeSession}),
+      });
     } else if (req.method === 'POST' && pathname === '/memory/records') {
       await memory.mutate(async () => {
         const body = await readJson(req, {limit: 256 * 1024});
         const {scope, records} = cleanBatch(body);
-        const epoch = await memory.store.epoch(scope);
         // A missing generation used to be accepted as current, which let a restarted
         // adapter or another browser recreate memories that had been deleted.
         if (!Number.isInteger(body?.epoch) || body.epoch < 0) {
           send(400, {code: 'memory_epoch_required', error: 'Memory sync needs a generation.'});
           return;
         }
-        if (body.epoch !== epoch) {
-          send(409, {code: 'memory_stale', error: 'Memory sync is stale.', epoch});
+        // The store accepts or rejects the generation in the same write as the insert.
+        // Checking it beforehand is not enough when two adapters share one database.
+        const saved = await memory.store.add(scope, records, {epoch: body.epoch});
+        if (saved.conflict) {
+          send(409, {code: 'memory_stale', error: 'Memory sync is stale.', epoch: saved.epoch});
           return;
         }
         send(200, {
           backend: memory.store.backend,
-          epoch,
-          ...(await memory.store.add(scope, records)),
+          epoch: saved.epoch,
+          stored: saved.stored,
+          acknowledged: saved.acknowledged,
         });
       });
     } else if (req.method === 'POST' && pathname === '/memory/clear') {

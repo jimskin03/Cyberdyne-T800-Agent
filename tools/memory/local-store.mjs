@@ -77,11 +77,19 @@ export function createLocalMemoryStore(directory, {maxRecords = 20000} = {}) {
         return Number.isInteger(value) ? value : 0;
       });
     },
-    add(scope, records) {
+    add(scope, records, {epoch} = {}) {
       return run(async () => {
+        scope = cleanScope(scope);
+        const map = await loadEpochs();
+        const current = Number.isInteger(map[scope]) ? map[scope] : 0;
+        // The caller's generation is checked in this same turn as the append, so a
+        // clear that already ran cannot be followed by those records.
+        if (Number.isInteger(epoch) && epoch !== current) {
+          return {conflict: true, epoch: current, stored: 0, acknowledged: []};
+        }
         const entry = await load(scope),
           fresh = records.filter((r) => !entry.ids.has(r.id));
-        if (!fresh.length) return {stored: 0, acknowledged: records.map((r) => r.id)};
+        if (!fresh.length) return {conflict: false, epoch: current, stored: 0, acknowledged: records.map((r) => r.id)};
         const storedAt = Date.now(),
           rows = fresh.map((r) => ({...r, storedAt}));
         await mkdir(directory, {recursive: true});
@@ -95,7 +103,7 @@ export function createLocalMemoryStore(directory, {maxRecords = 20000} = {}) {
           entry.ids = new Set(entry.rows.map((r) => r.id));
           await rewrite(scope, entry.rows);
         }
-        return {stored: rows.length, acknowledged: records.map((r) => r.id)};
+        return {conflict: false, epoch: current, stored: rows.length, acknowledged: records.map((r) => r.id)};
       });
     },
     recall(scope, query, options) {
