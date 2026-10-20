@@ -6,10 +6,10 @@
   "rig": "createBot-v1",
   "style": "stylized interpretation of user reference",
   "stats": {
-    "vertices": 50488,
-    "triangles": 93846,
-    "drawCalls": 64,
+    "vertices": 26531,
+    "triangles": 46040,
+    "drawCalls": 58,
     "joints": 17,
-    "glbBytes": 2386868
+    "glbBytes": 1233956
   }
 }

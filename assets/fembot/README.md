@@ -1,7 +1,9 @@
 # Fembot — cyborg assistant
 
-An initial stylized 3D interpretation of the supplied portrait: blonde updo,
-warm face, chrome body panels, black jacket, raised collar, and cyan lighting.
+A stylized 3D interpretation of the supplied portrait: a faceted chrome face,
+a thin crown spike, narrow glowing cyan eyes, a small red nose light, a thin
+dark mouth, and flat circular ears, with chrome body panels, a black jacket,
+a raised collar, and cyan lighting.
 The legs and boots are an original extension of the upper-body reference.
 
 ## Play in the cell
@@ -23,8 +25,8 @@ replacement skeleton, animation mixer or physics simulation.
 
 This is an appearance asset. It does not replace the default authored brain,
 change the server's `AGENT_NAME`, or rewrite the existing T-800 role prompts.
-Longer hair and jacket tails are rigid joint attachments; they have no cloth or
-hair simulation. Coarse body collision remains identical to the original robot.
+Jacket tails are rigid joint attachments; they have no cloth simulation.
+Coarse body collision remains identical to the original robot.
 
 ## Blender
 

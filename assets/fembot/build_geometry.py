@@ -17,17 +17,18 @@ PI = math.pi
 sin, cos = math.sin, math.cos
 MATERIALS = {
     'skin': {'color': [0.64, 0.32, 0.23], 'roughness': .46, 'metallic': 0},
-    'lip': {'color': [.38, .055, .075], 'roughness': .32, 'metallic': 0},
+    'lip': {'color': [.86, .32, .48], 'roughness': .28, 'metallic': .06},
     'chrome': {'color': [.55, .63, .73], 'roughness': .22, 'metallic': .92},
     'edge': {'color': [.16, .21, .28], 'roughness': .27, 'metallic': .85},
     'leather': {'color': [.012, .018, .027], 'roughness': .38, 'metallic': .18},
     'rubber': {'color': [.008, .011, .018], 'roughness': .68, 'metallic': .05},
-    'hair': {'color': [.19, .095, .039], 'roughness': .4, 'metallic': .05},
-    'gold': {'color': [.47, .27, .105], 'roughness': .38, 'metallic': .13},
-    'highlight': {'color': [.7, .45, .22], 'roughness': .32, 'metallic': .1},
+    'hair': {'color': [.28, .13, .05], 'roughness': .5, 'metallic': .08},
+    'gold': {'color': [.92, .72, .08], 'roughness': .42, 'metallic': .16},
+    'highlight': {'color': [.95, .84, .38], 'roughness': .36, 'metallic': .14},
     'cyan': {'color': [.01, .55, .8], 'roughness': .23, 'metallic': .35, 'emissive': [.01, .65, 1]},
     'white': {'color': [.78, .83, .81], 'roughness': .28, 'metallic': 0},
-    'iris': {'color': [.035, .18, .19], 'roughness': .2, 'metallic': .1},
+    'iris': {'color': [.35, .82, 1], 'roughness': .2, 'metallic': .02, 'emissive': [.2, .85, 1]},
+    'nose': {'color': [1, .38, .42], 'roughness': .24, 'metallic': .02, 'emissive': [1, .16, .22]},
     'black': {'color': [.004, .006, .01], 'roughness': .3, 'metallic': 0},
 }
 # Head y is the fembot neck length. createBot keeps the longer T-800 neck at
@@ -46,9 +47,12 @@ for s, side in [(-1, 'L'), (1, 'R')]:
                 f'foot{side}': [f'knee{side}', [0, -1.1, 0]]})
 meshes = []
 
-def mesh(name, joint, mat, verts, faces):
+def mesh(name, joint, mat, verts, faces, flat=False):
+    # flat splits later into one vertex per corner so face normals survive
+    # the studio render, which marks every polygon smooth.
     meshes.append({'name': name, 'joint': joint, 'material': mat,
-                   'vertices': [[round(v, 6) for v in p] for p in verts], 'faces': faces})
+                   'vertices': [[round(v, 6) for v in p] for p in verts],
+                   'faces': faces, 'flat': flat})
 
 def surface(name, joint, mat, rows, cols, fn, wrap=False):
     vs = [fn(i/rows, j/cols) for i in range(rows+1) for j in range(cols+1)]
@@ -93,6 +97,23 @@ def curve(name,joint,mat,control,r=.015,n=24,sides=8):
         pts.append([.5*((2*p1[a])+(-p0[a]+p2[a])*f+(2*p0[a]-5*p1[a]+4*p2[a]-p3[a])*f*f+(-p0[a]+3*p1[a]-3*p2[a]+p3[a])*f*f*f) for a in range(3)])
     tube(name,joint,mat,pts,r,sides)
 
+def annulus(name, joint, mat, center, r0, r1, axis='z', seg=32):
+    # Flat ring. +Z faces the front; +X faces the character's left.
+    vs=[]; fs=[]
+    for i in range(seg):
+        t=2*PI*i/seg; ca,sa=cos(t),sin(t)
+        if axis=='x':
+            inner=[center[0], center[1]+r0*ca, center[2]+r0*sa]
+            outer=[center[0], center[1]+r1*ca, center[2]+r1*sa]
+        else:
+            inner=[center[0]+r0*ca, center[1]+r0*sa, center[2]]
+            outer=[center[0]+r1*ca, center[1]+r1*sa, center[2]]
+        vs.extend([inner, outer])
+    for i in range(seg):
+        a=i*2; b=((i+1)%seg)*2
+        fs.extend([[a, a+1, b],[a+1, b+1, b]])
+    mesh(name, joint, mat, vs, fs)
+
 def shell(name,joint,mat,levels,start=-PI,end=PI,seg=48):
     # (height, x radius, z radius, z centre). Open sections form jacket panels.
     vs=[];fs=[]
@@ -105,53 +126,171 @@ def shell(name,joint,mat,levels,start=-PI,end=PI,seg=48):
             fs.extend([[a,a+1,b],[a+1,b+1,b]])
     mesh(name,joint,mat,vs,fs)
 
-# A continuous shaped face, with a subtly modeled bridge and nose.
-profile=[(-.35,.07,.15,.03),(-.31,.16,.21,.02),(-.23,.25,.25,0),(-.12,.30,.285,0),(.02,.34,.31,0),(.16,.345,.31,-.005),(.30,.33,.30,-.025),(.43,.30,.27,-.045),(.53,.235,.22,-.04),(.59,.10,.12,-.03),(.61,.005,.005,-.02)]
-def face(u,v):
-    t=u*(len(profile)-1);k=min(len(profile)-2,int(t)); f=t-k
-    y,rx,rz,zc=[profile[k][a]*(1-f)+profile[k+1][a]*f for a in range(4)]
-    a=(v*2-1)*PI; x=rx*sin(a); z=zc+rz*cos(a)
-    front=max(0,cos(a))**12
-    z+=front*(.105*math.exp(-(x/.055)**2-((y+.015)/.11)**2)+.035*math.exp(-(x/.065)**2-((y-.14)/.16)**2))
-    return [x,y,z]
-surface('Face', 'head','skin',64,72,face)
-for s in [-1,1]:
-    ell('Ear','head','skin',[s*.337,.025,-.012],[.057,.105,.065],20,16)
-    ell('Ear implant','head','chrome',[s*.37,-.03,.025],[.026,.05,.04],16,12)
-    ell('Ear diode','head','cyan',[s*.383,-.03,.055],[.012,.021,.009],12,8)
-    # Almond eye surface with its outer corner raised slightly.
-    ex=s*.148
-    surface('Eye white','head','white',12,28,lambda u,v,s=s,ex=ex:[ex+(v*2-1)*.103,.145+.012*s*(v*2-1)+sin(PI*v)*(.05*(1-u)-.037*u),.298+.029*sin(PI*v)*sin(PI*u)])
-    ell('Iris','head','iris',[ex,.147,.325],[.041,.041,.009],24,16)
-    ell('Pupil','head','black',[ex,.147,.334],[.02,.024,.005],20,12)
-    ell('Catchlight','head','white',[ex-.012,.162,.339],[.009,.009,.003],12,8)
-    curve('Upper lash','head','black',[[ex-.103,.145-s*.012,.3],[ex-.048,.187,.321],[ex+.035,.19,.322],[ex+.103,.145+s*.012,.3]],.0085)
-    curve('Lower eyelid','head','skin',[[ex-.103,.145-s*.012,.3],[ex,.109,.315],[ex+.103,.145+s*.012,.3]],.006)
-    curve('Brow','head','hair',[[s*.055,.259,.303],[s*.14,.283,.303],[s*.23,.266,.278],[s*.265,.244,.256]],.017)
-    ell('Nostril','head','lip',[s*.035,-.045,.385],[.014,.007,.007],12,8)
-# Warm, slightly open smile; small teeth ribbon, separate lower lip follows jaw.
-curve('Mouth shadow','head','lip',[[-.16,-.12,.265],[-.09,-.16,.292],[0,-.173,.31],[.09,-.16,.292],[.16,-.12,.265]],.014)
-curve('Smile','head','white',[[-.125,-.143,.29],[0,-.167,.316],[.125,-.143,.29]],.009)
-curve('Upper lip','head','lip',[[-.15,-.12,.278],[-.05,-.133,.32],[0,-.14,.328],[.05,-.133,.32],[.15,-.12,.278]],.012)
-curve('Lower lip','jaw','lip',[[-.135,.027,.165],[0,-.013,.2],[.135,.027,.165]],.017)
-# Hair cap leaves the face open; layered swept strands collect at the crown.
-surface('Hair foundation','head','hair',26,48,lambda u,v:[.365*sin(.05+u*(1.55+.95*(1-max(0,cos(v*2*PI)))))*sin(v*2*PI),.10+.54*cos(.05+u*(1.55+.95*(1-max(0,cos(v*2*PI))))),-.04+.33*sin(.05+u*(1.55+.95*(1-max(0,cos(v*2*PI)))))*cos(v*2*PI)])
-ell('Updo','head','hair',[.035,.64,-.16],[.265,.235,.245])
-for i in range(22):
-    a=2*PI*i/22
-    curve('Updo ribbon','head','gold' if i%3 else 'highlight',[[.035+.25*cos(a),.64+.15*sin(a),-.15],[.02+.24*cos(a+.7),.70+.19*sin(a+.7),-.28],[.02+.12*cos(a+1.4),.79,-.18]],.022,18)
-for s in [-1,1]:
-    for i in range(13):
-        k=i/12
-        curve('Swept hair','head','gold' if i%3 else 'highlight',[[s*(.015+k*.09),.59-.06*k,.10+.14*k],[s*(.19+.10*k),.49,.17+.1*k],[s*(.34+.018*k),.25,.10],[s*.24,.50,-.27],[s*.08,.72,-.2]],.015+(.008 if i%4==0 else 0),32)
-    for i in range(4):
-        curve('Face framing lock','head','gold' if i%2 else 'highlight',[[s*(.12+i*.016),.56,.22],[s*(.30+i*.014),.36,.29],[s*(.33+i*.018),.02,.19],[s*(.39-i*.009),-.20,.12],[s*.31,-.38,.19]],.012+i*.001,32)
+# Faceted silver head for issue #47. Crown spike, narrow cyan eyes, a small
+# red nose, a thin mouth, and flat side ears. head_iris stays the eyes so the
+# facing test still has a target. +X is the character's left; lathe i=0 is +Z.
+def sub(a,b): return [a[i]-b[i] for i in range(3)]
+def cross(u,v): return [u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]]
+def dot(u,v): return u[0]*v[0]+u[1]*v[1]+u[2]*v[2]
+def unit(v):
+    L=math.sqrt(dot(v,v)) or 1
+    return [x/L for x in v]
+def add_tri(vs, fs, a, b, c, center):
+    n=cross(sub(vs[b],vs[a]), sub(vs[c],vs[a]))
+    if dot(n,n) < 1e-16: return
+    mid=[(vs[a][i]+vs[b][i]+vs[c][i])/3 for i in range(3)]
+    if dot(n, sub(mid, center)) < 0: b,c = c,b
+    fs.append([a,b,c])
+
+N=10
+# Authored small, then widened. The pauldrons leave about a 0.94 gap; the
+# skull should fill it instead of sitting as a thin shell on the collar.
+SX, SY, SZ = 1.7, 1.15, 1.85
+# (y, x radius, z radius, z centre). The chin stays below y=-.22 so it meets the collar.
+rings=[
+    (-.24,.11,.085,.055),
+    (-.14,.19,.135,.04),
+    (-.05,.24,.155,.032),
+    (.04,.265,.162,.026),
+    (.12,.285,.148,.02),
+    (.19,.275,.16,.03),
+    (.26,.25,.15,.012),
+    (.33,.20,.125,.0),
+    (.39,.11,.075,-.008),
+]
+def ring_point(ri, i):
+    y,rx,rz,zc=rings[ri]
+    a=2*PI*i/N
+    front=max(0., cos(a))
+    return [SX*rx*sin(a), SY*y, SZ*(zc+rz*cos(a))+.02*front*front]
+def facet_point(r0, i0, u, v):
+    p00=ring_point(r0, i0%N); p01=ring_point(r0, (i0+1)%N)
+    p10=ring_point(r0+1, i0%N); p11=ring_point(r0+1, (i0+1)%N)
+    def mix(p,q,t): return [p[k]*(1-t)+q[k]*t for k in range(3)]
+    return mix(mix(p00,p01,u), mix(p10,p11,u), v)
+def outward_normal(p00, p01, p10):
+    n=unit(cross(sub(p01,p00), sub(p10,p00)))
+    mid=[(p00[i]+p01[i]+p10[i])/3 for i in range(3)]
+    if dot(n, sub(mid, [0,.05,.02])) < 0: n=[-x for x in n]
+    return n
+
+vs=[]; fs=[]; inside=[0,.08*SY,.02*SZ]
+for ri in range(len(rings)):
+    for i in range(N): vs.append(ring_point(ri, i))
+for ri in range(len(rings)-1):
+    for i in range(N):
+        a=ri*N+i; b=ri*N+(i+1)%N; c=(ri+1)*N+i; d=(ri+1)*N+(i+1)%N
+        add_tri(vs, fs, a, b, d, inside)
+        add_tri(vs, fs, a, d, c, inside)
+chin=[0,-.29*SY,.07*SZ]
+ci=len(vs); vs.append(chin)
+for i in range(N):
+    add_tri(vs, fs, ci, (i+1)%N, i, inside)
+front_nz=[]
+for a,b,c in fs:
+    mid=[(vs[a][i]+vs[b][i]+vs[c][i])/3 for i in range(3)]
+    if mid[2] > .12 and abs(mid[0]) < .08 and -.12 < mid[1] < .22:
+        front_nz.append(unit(cross(sub(vs[b],vs[a]), sub(vs[c],vs[a])))[2])
+if not front_nz or min(front_nz) < .35:
+    raise SystemExit('face facets do not point forward: %s' % front_nz)
+crown=[0,.43*SY,-.008*SZ]
+ki=len(vs); vs.append(crown)
+base=(len(rings)-1)*N
+for i in range(N):
+    add_tri(vs, fs, ki, base+i, base+(i+1)%N, inside)
+# Spike base sits inside the crown, so the tip reads as one antenna.
+spike_r=.012*SX; spike_z=-.008*SZ; spike_seg=5; spike_y=.41*SY
+sb=len(vs)
+for j in range(spike_seg):
+    a=2*PI*j/spike_seg
+    vs.append([spike_r*sin(a), spike_y, spike_z+spike_r*cos(a)])
+tip=len(vs); vs.append([0, spike_y+.64, spike_z])
+spike_inside=[0, spike_y+.32, spike_z]
+for j in range(spike_seg):
+    add_tri(vs, fs, sb+j, sb+(j+1)%spike_seg, tip, spike_inside)
+for j in range(1, spike_seg-1):
+    add_tri(vs, fs, sb, sb+j+1, sb+j, spike_inside)
+def add_disc(origin, axis, radius=.055, depth=.02, seg=16):
+    ax=unit(axis)
+    tmp=[0,1,0] if abs(ax[1]) < .9 else [1,0,0]
+    bx=unit(cross(tmp, ax)); by=unit(cross(ax, bx))
+    i0=len(vs)
+    for sign in (-1, 1):
+        for j in range(seg):
+            t=2*PI*j/seg
+            vs.append([origin[k]+sign*depth*.5*ax[k]+radius*(bx[k]*cos(t)+by[k]*sin(t)) for k in range(3)])
+    for j in range(seg):
+        a=i0+j; b=i0+(j+1)%seg; c=i0+seg+j; d=i0+seg+(j+1)%seg
+        add_tri(vs, fs, a, b, c, origin)
+        add_tri(vs, fs, b, d, c, origin)
+    for j in range(1, seg-1):
+        add_tri(vs, fs, i0, i0+j, i0+j+1, origin)
+        add_tri(vs, fs, i0+seg, i0+seg+j+1, i0+seg+j, origin)
+side=ring_point(4, N//4)
+ear_axis=[.9, 0, .44]
+add_disc([side[0]+.02*SX, side[1], side[2]], ear_axis, radius=.062*SX)
+add_disc([-side[0]-.02*SX, side[1], side[2]], [-ear_axis[0], 0, ear_axis[2]], radius=.062*SX)
+mesh('Cranium','head','chrome',vs,fs,flat=True)
+
+def diamond(name, joint, mat, pts, normal, lift=.006):
+    q=[[p[k]+normal[k]*lift for k in range(3)] for p in pts]
+    behind=[q[0][k]-normal[k] for k in range(3)]
+    dv=list(q); df=[]
+    add_tri(dv, df, 0, 1, 2, behind)
+    add_tri(dv, df, 0, 2, 3, behind)
+    nz=unit(cross(sub(dv[df[0][1]], dv[df[0][0]]), sub(dv[df[0][2]], dv[df[0][0]])))[2]
+    if nz < .5: raise SystemExit('%s faces %s, not +Z' % (name, round(nz, 3)))
+    mesh(name, joint, mat, dv, df, flat=True)
+def eye_pts(s):
+    # Outer corner is slightly higher than the inner corner.
+    if s>0:
+        i0,m=0,(lambda u: u)
+    else:
+        i0,m=N-1,(lambda u: 1-u)
+    return [facet_point(4, i0, m(u), v) for u,v in ((.2,.36),(.52,.58),(.92,.48),(.5,.28))]
+for s in (-1, 1):
+    pts=eye_pts(s)
+    diamond('Iris','head','iris',pts,outward_normal(pts[0], pts[1], pts[3]))
+top=facet_point(3, 0, 0, .7)
+bot=facet_point(3, 0, 0, .12)
+left=facet_point(3, 0, .18, .4)
+right=facet_point(3, N-1, 1-.18, .4)
+nose_n=outward_normal(right, top, left)
+apex=[(top[i]+bot[i])*.5+nose_n[i]*.032*SZ for i in range(3)]
+if apex[2] <= max(top[2], bot[2], left[2], right[2]):
+    raise SystemExit('nose sits behind the face')
+nv=[top, left, bot, right, apex]
+nf=[]; nose_in=[apex[i]-nose_n[i] for i in range(3)]
+for i in range(4):
+    add_tri(nv, nf, i, (i+1)%4, 4, nose_in)
+mesh('Nose','head','nose',nv,nf,flat=True)
+lip=ring_point(2, 0)
+mouth_y, mouth_z=lip[1]+.015*SY, lip[2]+.012*SZ
+mw, mh=.07*SX, .008*SY
+mouth=[[-mw, mouth_y+mh, mouth_z],[mw, mouth_y+mh, mouth_z],[mw, mouth_y-mh, mouth_z],[-mw, mouth_y-mh, mouth_z]]
+diamond('Mouth','head','black',mouth,[0,0,1],0)
+# Jaw pivot is head (0, -.18, .12). Positive jaw X drops this plate and opens the line.
+low_y=mouth_y-mh-.006*SY
+mz=mouth_z
+xs=(-.062*SX,.062*SX); ys=(low_y-.028*SY, low_y); zs=(mz-.018*SZ, mz-.008*SZ)
+pv=[]
+for z in zs:
+    for y in ys:
+        for x in xs:
+            pv.append([x, y+.18, z-.12])
+jc=[0, (ys[0]+ys[1])*.5+.18, (zs[0]+zs[1])*.5-.12]
+pf=[]
+def quad(a,b,c,d):
+    add_tri(pv, pf, a, b, c, jc)
+    add_tri(pv, pf, a, c, d, jc)
+quad(4,5,7,6); quad(1,0,2,3); quad(2,6,7,3); quad(0,1,5,4); quad(1,3,7,5); quad(0,4,6,2)
+mesh('Lower mouth','jaw','chrome',pv,pf,flat=True)
 
 # Short column from the collar to just under the jaw. The old stack ran to
 # y=.56 under a head pivot at y=.78, about twice a plausible neck.
-shell('Neck alloy','neck','chrome',[(.02,.150,.130,0),(.10,.165,.142,0),(.19,.158,.136,0),(.28,.132,.116,0)])
+shell('Neck alloy','neck','chrome',[(.02,.183,.159,0),(.10,.201,.173,0),(.19,.193,.166,0),(.28,.161,.142,0)])
 for y in [.08,.15,.22]:
-    curve('Neck seal','neck','edge',[[.158*sin(a),y,.145*cos(a)] for a in [i*2*PI/32 for i in range(33)]],.008,32)
+    curve('Neck seal','neck','edge',[[.195*sin(a),y,.170*cos(a)] for a in [i*2*PI/32 for i in range(33)]],.01,32)
 shell('Body undersuit','torso','rubber',[(-.79,.43,.27,0),(-.55,.35,.24,0),(-.2,.38,.26,0),(.18,.55,.30,0),(.43,.56,.22,0),(.54,.20,.16,0)])
 shell('Abdominal shell','torso','chrome',[(-.73,.38,.27,.025),(-.48,.32,.27,.025),(-.16,.37,.28,.025),(.09,.50,.29,.02)],-.98,.98)
 for s in [-1,1]:
@@ -221,12 +360,34 @@ for s in [-1,1]:
     ell('Toe alloy',foot,'chrome',[0,.03,.33],[.164,.075,.13])
 
 # Coalesce by joint/material: bounded draw calls without changing the articulation.
+# A flat piece splits every triangle of that pair, so faceted metal stays on its own material.
 merged={}
 for m in meshes:
     key=(m['joint'],m['material'])
-    dest=merged.setdefault(key,{'name':f"{m['joint']}_{m['material']}",'joint':m['joint'],'material':m['material'],'vertices':[],'faces':[]})
+    dest=merged.setdefault(key,{'name':f"{m['joint']}_{m['material']}",'joint':m['joint'],'material':m['material'],'vertices':[],'faces':[],'flat':False})
+    if m.get('flat'): dest['flat']=True
     offset=len(dest['vertices']);dest['vertices'].extend(m['vertices']);dest['faces'].extend([[v+offset for v in f] for f in m['faces']])
 meshes=list(merged.values())
+for m in meshes:
+    if not m.pop('flat', False): continue
+    split_vs=[]; split_fs=[]
+    for a,b,c in m['faces']:
+        b0=len(split_vs)
+        split_vs.extend([m['vertices'][a], m['vertices'][b], m['vertices'][c]])
+        split_fs.append([b0, b0+1, b0+2])
+    m['vertices']=split_vs; m['faces']=split_fs
+head=next(m for m in meshes if m['name']=='head_chrome')
+head_min_y=min(v[1] for v in head['vertices'])
+head_max_y=max(v[1] for v in head['vertices'])
+head_max_x=max(abs(v[0]) for v in head['vertices'])
+if head_min_y >= -.22: raise SystemExit('chin %s does not reach the neck' % head_min_y)
+if head_max_y < .9: raise SystemExit('spike %s is too short' % head_max_y)
+if head_max_x < .26: raise SystemExit('ears %s do not clear the cranium' % head_max_x)
+iris=next(m for m in meshes if m['name']=='head_iris')
+ic=[sum(v[i] for v in iris['vertices'])/len(iris['vertices']) for i in range(3)]
+if ic[2] <= abs(ic[0])+.05: raise SystemExit('eyes are not in front: %s' % ic)
+if not any(m['name']=='jaw_chrome' for m in meshes): raise SystemExit('jaw mouth missing')
+if not any(m['name']=='head_nose' for m in meshes): raise SystemExit('nose missing')
 spec={'name':'Fembot','role':'Cyborg assistant','version':1,'units':'host rig units; multiply by 0.38 for metres','rig':RIG,'materials':MATERIALS,'meshes':meshes}
 (OUT/'fembot.mesh.json').write_text(json.dumps(spec,separators=(',',':')),encoding='utf8')
 
@@ -268,4 +429,4 @@ data=struct.pack('<III',0x46546c67,2,12+8+len(js)+8+len(binary))+struct.pack('<I
 (OUT/'fembot.glb').write_bytes(data)
 summary={'vertices':sum(len(m['vertices']) for m in meshes),'triangles':sum(len(m['faces']) for m in meshes),'drawCalls':len(meshes),'joints':len(RIG),'glbBytes':len(data)}
 (OUT/'asset.json').write_text(json.dumps({'id':'fembot','name':'Fembot','role':'Cyborg assistant','model':'fembot.glb','rig':'createBot-v1','style':'stylized interpretation of user reference','stats':summary},indent=2)+'\n')
-print(json.dumps(summary))
+print(json.dumps({**summary, 'headMinY':round(head_min_y,4), 'spikeTop':round(head_max_y,4), 'irisCenter':[round(v,4) for v in ic]}))
