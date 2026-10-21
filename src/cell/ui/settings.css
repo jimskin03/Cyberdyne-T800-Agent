@@ -123,3 +123,6 @@
     grid-template-columns: 1fr;
   }
 }
+#settings .control-row[hidden] {
+  display: none;
+}
