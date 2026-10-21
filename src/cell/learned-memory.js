@@ -196,7 +196,7 @@ export function createLearnedMemory({
       try {
         const data = await call('/status?scope=' + scope, {signal: linked.signal});
         noteRemoteGeneration(data?.epoch);
-        await flush({signal: linked.signal});
+        await flush({signal});
         return data;
       } catch {
         return null;
