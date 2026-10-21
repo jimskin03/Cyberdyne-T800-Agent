@@ -1,5 +1,5 @@
 import {readFileSync} from 'node:fs';
-import {mkdir, readFile, writeFile} from 'node:fs/promises';
+import {link, mkdir, readFile, unlink, writeFile} from 'node:fs/promises';
 import {randomBytes} from 'node:crypto';
 import {join, resolve} from 'node:path';
 
@@ -50,7 +50,23 @@ export async function ensureMemoryToken({token, directory}) {
   }
   await mkdir(directory, {recursive: true, mode: 0o700});
   const fresh = randomBytes(32).toString('base64url');
-  await writeFile(path, fresh + '\n', {mode: 0o600});
+  // Two adapters starting on one MEMORY_DIR must agree on the token: the complete
+  // file is hard-linked into place, which fails if another adapter already won.
+  const temp = `${path}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
+  await writeFile(temp, fresh + '\n', {mode: 0o600});
+  try {
+    await link(temp, path);
+  } catch (error) {
+    if (error.code === 'EEXIST') {
+      const saved = (await readFile(path, 'utf8')).trim();
+      if (TOKEN.test(saved)) return {token: saved, source: 'file', path};
+    }
+    if (!['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS', 'EXDEV', 'EMLINK', 'EEXIST'].includes(error.code)) throw error;
+    // No hard links (or an unreadable leftover): fall back to replacing the file.
+    await writeFile(path, fresh + '\n', {mode: 0o600});
+  } finally {
+    await unlink(temp).catch(() => {});
+  }
   return {token: fresh, source: 'generated', path};
 }
 
