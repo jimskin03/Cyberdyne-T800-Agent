@@ -138,10 +138,12 @@ The credentials stay in the Node backend. The browser bundle never sees them. To
 
 Each clear advances a generation stored with the memories. That generation survives an adapter restart. A browser uploads with the generation it last had accepted, and a sync without a generation is rejected. If another browser has deleted learned memory, the adapter refuses the older generation. Copies this browser had already synchronized are removed when it next hears that newer generation, so they are not recalled while the adapter is offline. Copies that had not been synchronized stay until you choose. **Upload this browser's copies** sends them on purpose. **Discard this browser's copies** drops them. Records saved after that refusal sync on their own. On Turso, the generation check and the insert commit together, so another adapter cannot write records from the generation that was just cleared.
 
+**Several adapters on one `MEMORY_DIR`.** More than one `npm run api` process can share a local memory directory. Each read and change of the local store runs under a lock file, `MEMORY_DIR/.learned-memory.lock`. Under that lock the adapter re-reads the generation and records from disk before it changes them, and rewrites go to a temporary file that is flushed and then renamed into place. A sync, a clear, or trimming in one adapter therefore cannot lose another adapter's records or bring back memories that another adapter deleted. Adapters starting together also agree on one generated token. If an adapter dies while holding the lock, the next adapter takes over at once when the dead process was on the same computer. A lock left by another computer is taken over after 10 seconds without a refresh. The lock relies on atomic file creation and renames in a local filesystem. Network filesystems such as NFS or SMB may not honour these, so on a network share run one adapter per directory, or use Turso.
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `MEMORY_API_TOKEN` | generated into `MEMORY_DIR/api-token` | Bearer token for `/memory` routes |
-| `MEMORY_DIR` | `saved-world/memory` | Local store and generated-token directory |
+| `MEMORY_DIR` | `saved-world/memory` | Local store and generated-token directory. Several adapters on one computer can share it |
 | `TURSO_DATABASE_URL` | blank | `libsql://` or `https://` database URL; enables Turso with the token below |
 | `TURSO_AUTH_TOKEN` | blank | Turso database token |
 
