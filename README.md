@@ -6,16 +6,9 @@ A standalone Three.js containment-cell scene with a procedural T-800 robot, mova
 
 This repository is a fork of [newbmechanix-ship-it/Cyberdyne-T800-Agent-Embodiment-Project](https://github.com/newbmechanix-ship-it/Cyberdyne-T800-Agent-Embodiment-Project). It adds the responsive and minimizable UI, browser CI, and the staged refactor from issue #8.
 
-<table>
-  <tr>
-    <td align="center"><img src="docs/screenshots/desktop.jpg" alt="Desktop view: the T-800 in its containment cell with the vitals and tools panel, JSON Brain graph, Mind Stream log, and unit POV inset" width="360"></td>
-    <td align="center"><img src="docs/screenshots/mobile.jpg" alt="Phone view: the T-800 in its cell with the top bar, Thinks box, and chat input" width="360"></td>
-  </tr>
-  <tr>
-    <td align="center">Desktop</td>
-    <td align="center">Phone</td>
-  </tr>
-</table>
+<p align="center">
+  <img src="assets/fembot/Fembot-preview.png" alt="Fembot: a faceted chrome face with a crown spike, narrow cyan eyes, a small red nose, and flat ear discs" width="420">
+</p>
 
 ## Run locally
 
