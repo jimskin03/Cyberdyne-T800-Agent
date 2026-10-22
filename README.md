@@ -2,12 +2,26 @@
 
 [![Verify project](https://github.com/jimskin03/Cyberdyne-T800-Agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jimskin03/Cyberdyne-T800-Agent/actions/workflows/ci.yml)
 
+**Status: in development.**
+
+<p align="center">
+  <a href="docs/media/t800-showcase.mp4"><img src="docs/media/t800-showcase-poster.jpg" alt="Cyberdyne T800 Agent showcase video: the T-800 in its containment cell. Select to play the 45-second video." width="820"></a>
+</p>
+
+<p align="center"><a href="docs/media/t800-showcase.mp4">▶ Watch the 45s showcase</a> (MP4, 14 MB)</p>
+
 A standalone Three.js containment-cell scene with a procedural T-800 robot, movable objects, physics, tool controls, water effects, climate controls, and a built-in computer. You can explore it offline, or connect your own agent through an API key, OAuth, or a local endpoint.
 
 This repository is a fork of [newbmechanix-ship-it/Cyberdyne-T800-Agent-Embodiment-Project](https://github.com/newbmechanix-ship-it/Cyberdyne-T800-Agent-Embodiment-Project). It adds the responsive and minimizable UI, browser CI, and the staged refactor from issue #8.
 
 <p align="center">
   <img src="assets/fembot/Fembot-preview.png" alt="Fembot: a faceted chrome face with a crown spike, narrow cyan eyes, a small red nose, and flat ear discs" width="420">
+</p>
+
+## Screenshot
+
+<p align="center">
+  <img src="docs/media/t800-screenshot.jpg" alt="The T-800 glowing with green circuits in the containment cell, with the JSON Brain, operator controls, Mind Stream, and dialogue panels around it" width="820">
 </p>
 
 ## Run locally
